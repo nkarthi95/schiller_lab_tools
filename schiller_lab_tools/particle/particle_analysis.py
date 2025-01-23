@@ -24,57 +24,52 @@ def calculate_average_cos_interface_normal(phi, positions, orientations, step_si
     are within a specified distance (`cutoff`) from the interface. It returns the angles for particles near the 
     interface and the number of particles that are not within the cutoff distance.
 
-    Parameters
-    ----------
-    phi : numpy.ndarray
+    :param phi: 
         A 3D numpy array representing the binary density field of two phases (fluid or otherwise). The marching 
         cubes algorithm is applied to identify the interface between the phases.
-
-    positions : numpy.ndarray
+    :type phi: numpy.ndarray
+    :param positions: 
         A 2D numpy array of shape (n, D), where `n` is the number of particles and `D` is the number of dimensions 
         of the system. Each row represents the position of a particle in the system.
-
-    orientations : numpy.ndarray
+    :type positions: numpy.ndarray
+    :param orientations: 
         A 2D numpy array of shape (n, D), where `n` is the number of particles and `D` is the number of dimensions. 
         Each row represents the orientation vector of a particle.
-
-    step_size : int, optional
+    :type orientations: numpy.ndarray
+    :param step_size: 
         The grid size for the marching cubes algorithm. A smaller value will produce more accurate results, but may 
         increase computation time. Default is 1.
-
-    cutoff : float, optional
+    :type step_size: int, optional
+    :param cutoff: 
         The maximum distance a particle can be from the interface to be considered for angle calculation. Particles 
         farther than this distance from the interface are excluded. Default is 7.9.
+    :type cutoff: float, optional
 
-    Returns
-    -------
-    theta : numpy.ndarray
-        A 1D numpy array of shape (m,) containing the angles (in degrees) between the particle orientations and the 
-        normal to the interface for all particles that are within the specified `cutoff` distance from the interface. 
-        Particles further than the `cutoff` are excluded.
+    :return: 
+        A tuple containing:
+        - `theta`: A 1D numpy array of shape (m,) containing the angles (in degrees) between the particle orientations 
+          and the normal to the interface for all particles that are within the specified `cutoff` distance from the interface.
+        - `mask`: A 1D numpy array containing the indices of the particles that are not within the `cutoff` distance 
+          from the interface.
+    :rtype: tuple (numpy.ndarray, numpy.ndarray)
 
-    mask : numpy.ndarray
-        A 1D numpy array containing the indices of the particles that are not within the `cutoff` distance from the 
-        interface. This array provides the indices of particles that were excluded from the angle calculation.
+    :notes: 
+        - The marching cubes algorithm is used to extract the interface (isosurface) from the `phi` field.
+        - The angle between each particle's orientation and the normal to the interface is calculated using the dot product, 
+          and the result is converted from radians to degrees.
+        - Particles with a center-to-interface distance greater than `cutoff` are excluded from the angle calculation.
+        - The output `theta` contains the angles in degrees, and the returned `mask` indicates which particles were excluded 
+          based on their distance from the interface.
 
-    Notes
-    -----
-    - The marching cubes algorithm is used to extract the interface (isosurface) from the `phi` field.
-    - The angle between each particle's orientation and the normal to the interface is calculated using the dot product, 
-      and the result is converted from radians to degrees.
-    - Particles with a center-to-interface distance greater than `cutoff` are excluded from the angle calculation.
-    - The output `theta` contains the angles in degrees, and the returned `mask` indicates which particles were excluded 
-      based on their distance from the interface.
-
-    Examples
-    --------
-    >>> phi = np.random.randn(100, 100, 100)  # Example binary field
-    >>> positions = np.random.rand(10, 3) * 100  # Random positions for 10 particles
-    >>> orientations = np.random.rand(10, 3)  # Random orientations for 10 particles
-    >>> theta, mask = calculate_average_cos_interface_normal(phi, positions, orientations)
-    >>> print(theta)  # Angles of particles near the interface
-    >>> print(mask)   # Indices of particles not near the interface
+    :examples: 
+        >>> phi = np.random.randn(100, 100, 100)  # Example binary field
+        >>> positions = np.random.rand(10, 3) * 100  # Random positions for 10 particles
+        >>> orientations = np.random.rand(10, 3)  # Random orientations for 10 particles
+        >>> theta, mask = calculate_average_cos_interface_normal(phi, positions, orientations)
+        >>> print(theta)  # Angles of particles near the interface
+        >>> print(mask)   # Indices of particles not near the interface
     """
+
     v, f, n, vals = measure.marching_cubes(phi, 0, step_size=step_size)  # verts, faces, normals, values
 
     distances = np.zeros(orientations.shape[0])
@@ -111,44 +106,40 @@ def calculate_rdf(boxDims, positions):
     density of particles as a function of distance from a reference particle. The function 
     returns the radii `r_s` and the normalized densities `g_r` for the system.
 
-    Parameters
-    ----------
-    boxDims : numpy.ndarray
+    :param boxDims: 
         A 1D numpy array of length D representing the dimensions of the simulation box. The values 
         in the array correspond to the size of the box along each dimension (e.g., [Lx, Ly, Lz] for a 
         3D system).
-
-    positions : numpy.ndarray
+    :type boxDims: numpy.ndarray
+    :param positions: 
         A 2D numpy array of shape (N, D) representing the positions of the particles in the system, 
         where N is the number of particles and D is the number of dimensions (e.g., 3 for a 3D system).
+    :type positions: numpy.ndarray
 
-    Returns
-    -------
-    r_s : numpy.ndarray
-        A 1D numpy array of the radii (bin edges) used in the RDF calculation. These represent 
+    :return: 
+        A tuple containing:
+        - `r_s`: A 1D numpy array of the radii (bin edges) used in the RDF calculation. These represent 
         the radial distances from a reference particle.
-
-    g_r : numpy.ndarray
-        A 1D numpy array of the normalized radial distribution function, which represents the 
+        - `g_r`: A 1D numpy array of the normalized radial distribution function, which represents the 
         density of particles as a function of distance from a reference particle.
+    :return type: tuple (numpy.ndarray, numpy.ndarray)
 
-    Notes
-    -----
-    - The `r_max` parameter is calculated as the ceiling of `np.min(boxDims) * np.sqrt(3) / 4`, 
-      which provides an estimate for the maximum radial distance used in the RDF calculation.
-    - The function uses the `freud.density.RDF` class from the freud library to perform the RDF computation.
-    - The radial distribution function is normalized such that `g_r = 1` for an ideal gas.
-    - The output `r_s` represents the bin edges, and `g_r` represents the density at each corresponding 
-      radial distance.
+    :notes: 
+        - The `r_max` parameter is calculated as the ceiling of `np.min(boxDims) * np.sqrt(3) / 4`, 
+        which provides an estimate for the maximum radial distance used in the RDF calculation.
+        - The function uses the `freud.density.RDF` class from the freud library to perform the RDF computation.
+        - The radial distribution function is normalized such that `g_r = 1` for an ideal gas.
+        - The output `r_s` represents the bin edges, and `g_r` represents the density at each corresponding 
+        radial distance.
 
-    Examples
-    --------
-    >>> boxDims = np.array([10.0, 10.0, 10.0])  # Simulation box dimensions in 3D
-    >>> positions = np.random.rand(1000, 3) * boxDims  # Random particle positions in 3D
-    >>> r_s, g_r = calculate_rdf(boxDims, positions)
-    >>> print(r_s)  # Radii used in the RDF calculation
-    >>> print(g_r)  # Normalized radial distribution function values
+    :examples: 
+        >>> boxDims = np.array([10.0, 10.0, 10.0])  # Simulation box dimensions in 3D
+        >>> positions = np.random.rand(1000, 3) * boxDims  # Random particle positions in 3D
+        >>> r_s, g_r = calculate_rdf(boxDims, positions)
+        >>> print(r_s)  # Radii used in the RDF calculation
+        >>> print(g_r)  # Normalized radial distribution function values
     """
+
     L = np.amin(boxDims)
     r_max = int(np.ceil(np.min(boxDims) * np.sqrt(3) / 4))
     rdf = freud.density.RDF(bins=r_max, r_max=r_max)
@@ -162,55 +153,53 @@ def calculate_rdf(boxDims, positions):
 
 
 def calculate_nematic_order(orientations, director=[0, 0, 1]):
-    """
-    Calculate the nematic order parameter for a system of particles.
+  """
+  Calculate the nematic order parameter for a system of particles.
 
-    This function computes the nematic order parameter, which measures the degree of alignment 
-    of the particles in a given direction, referred to as the director. The director is typically 
-    chosen to be a vector that represents the preferred direction of alignment in the system, 
-    and the nematic order quantifies how well the particle orientations are aligned with this 
-    direction.
+  This function computes the nematic order parameter, which measures the degree of alignment 
+  of the particles in a given direction, referred to as the director. The director is typically 
+  chosen to be a vector that represents the preferred direction of alignment in the system, 
+  and the nematic order quantifies how well the particle orientations are aligned with this 
+  direction.
 
-    Parameters
-    ----------
-    orientations : numpy.ndarray
-        A 2D numpy array of shape (N, D) representing the orientations of the particles, where 
-        N is the number of particles and D is the number of dimensions. Each row contains the 
-        orientation vector of a single particle in the system.
+  :param orientations: 
+      A 2D numpy array of shape (N, D) representing the orientations of the particles, where 
+      N is the number of particles and D is the number of dimensions. Each row contains the 
+      orientation vector of a single particle in the system.
+  :type orientations: numpy.ndarray
+  :param director: 
+      A 1D array or list of length D representing the director vector along which the nematic 
+      order is computed. This vector specifies the preferred direction of alignment in the system. 
+      If not provided, the default is the unit vector along the z-axis, i.e., [0, 0, 1].
+      :default: [0, 0, 1]
+  :type director: list or numpy.ndarray, optional
 
-    director : list or numpy.ndarray, optional, default=[0, 0, 1]
-        A 1D array or list of length D representing the director vector along which the nematic 
-        order is computed. This vector specifies the preferred direction of alignment in the system. 
-        If not provided, the default is the unit vector along the z-axis, i.e., [0, 0, 1].
+  :return: 
+      The nematic order parameter of the system, which quantifies the alignment of the particle 
+      orientations with the director. Values of 1, 0, and -0.5 indicate perfect alignment, no alignment, 
+      and opposite orthogonal alignment respectively.
+  :return type: float
 
-    Returns
-    -------
-    nematic_order : float
-        The nematic order parameter of the system, which quantifies the alignment of the particle 
-        orientations with the director. Values of 1, 0 and -0.5 indicate perfect alignment, no alignment and opposite
-        orthogonal alignment respectively.
+  :notes: 
+      - The nematic order parameter is computed using the `freud.order.Nematic` class from the freud 
+        library, which uses the orientation of the particles relative to the provided director.
+      - This function assumes that the director is a vector that represents the axis of preferred alignment. 
+        It is commonly used in systems such as liquid crystals or systems of elongated particles.
+      - A positive nematic order indicates a preference for alignment along the director, while a negative 
+        value would indicate an opposite alignment.
 
-    Notes
-    -----
-    - The nematic order parameter is computed using the `freud.order.Nematic` class from the freud 
-      library, which uses the orientation of the particles relative to the provided director.
-    - This function assumes that the director is a vector that represents the axis of preferred alignment. 
-      It is commonly used in systems such as liquid crystals or systems of elongated particles.
-    - A positive nematic order indicates a preference for alignment along the director, while a negative 
-      value would indicate an opposite alignment.
-
-    Examples
-    --------
-    >>> orientations = np.random.rand(100, 3)  # 100 random particle orientations in 3D
-    >>> director = [0, 0, 1]  # Director along the z-axis
-    >>> nematic_order = calculate_nematic_order(orientations, director)
-    >>> print(nematic_order)  # Nematic order parameter of the system
-    """
-    if not isinstance(director, np.ndarray):
-        director = np.array(director)
-    nematic = freud.order.Nematic(director)
-    nematic.compute(orientations)
-    return nematic.order
+  :examples: 
+      >>> orientations = np.random.rand(100, 3)  # 100 random particle orientations in 3D
+      >>> director = [0, 0, 1]  # Director along the z-axis
+      >>> nematic_order = calculate_nematic_order(orientations, director)
+      >>> print(nematic_order)  # Nematic order parameter of the system
+  """
+  
+  if not isinstance(director, np.ndarray):
+      director = np.array(director)
+  nematic = freud.order.Nematic(director)
+  nematic.compute(orientations)
+  return nematic.order
 
 
 # In[5]:
@@ -225,46 +214,42 @@ def calculate_minkowski_q(boxDims, positions, L=6):
     the local environment of each particle, and then calculates the Steinhardt order parameter to describe 
     the local symmetry of the particle arrangements.
 
-    Parameters
-    ----------
-    boxDims : list or numpy.ndarray
-        A 1D array or list of length D representing the dimensions of the simulation box, where D is the 
-        number of dimensions. The array should contain the box lengths along each dimension (e.g., 
-        [Lx, Ly, Lz] for a 3D system).
-    
-    positions : numpy.ndarray
-        A 2D numpy array of shape (N, D) where N is the number of particles, and D is the number of dimensions.
-        Each row represents the position of a single particle in the system.
+    :param boxDims: A 1D array or list of length D representing the dimensions of the simulation box, 
+                    where D is the number of dimensions. The array should contain the box lengths along 
+                    each dimension (e.g., [Lx, Ly, Lz] for a 3D system).
+    :type boxDims: list or numpy.ndarray
 
-    L : int, optional, default=6
-        The Steinhardt order parameter to compute. The order parameter quantifies the local symmetry of 
-        the particle arrangement, and higher orders (e.g., L=6) correspond to more detailed descriptions 
-        of the local symmetry. The default is L=6, which corresponds to the typical hexagonal or crystalline 
-        symmetry for many systems.
+    :param positions: A 2D numpy array of shape (N, D) where N is the number of particles, and D is 
+                      the number of dimensions. Each row represents the position of a single particle 
+                      in the system.
+    :type positions: numpy.ndarray
 
-    Returns
-    -------
-    ql_sc : numpy.ndarray
-        A 1D numpy array of size N, where each element represents the Minkowski structure metric (Steinhardt 
-        order parameter) of order L for the corresponding particle in the system.
+    :param L: The Steinhardt order parameter to compute. The order parameter quantifies the local symmetry 
+              of the particle arrangement, and higher orders (e.g., L=6) correspond to more detailed descriptions 
+              of the local symmetry. The default is L=6, which corresponds to the typical hexagonal or crystalline 
+              symmetry for many systems.
+    :type L: int, optional, default=6
 
-    Notes
-    -----
-    - The function uses the `freud.locality.Voronoi` class to compute the Voronoi tessellation and the 
-      `freud.order.Steinhardt` class to compute the Steinhardt order parameter.
-    - The Voronoi tessellation is used to identify the local neighborhood of each particle, and the Steinhardt 
-      order parameter describes how ordered that neighborhood is.
-    - The returned array contains the Steinhardt order parameter for each particle, quantifying the local 
-      symmetry around that particle. A higher value indicates a more ordered arrangement in the local environment.
-    
-    Examples
-    --------
-    >>> boxDims = [10, 10, 10]  # Box dimensions for a 3D system
-    >>> positions = np.random.rand(100, 3) * boxDims  # 100 random particle positions in 3D
-    >>> L = 6  # Steinhardt order parameter to calculate
-    >>> ql_sc = calculate_minkowski_q(boxDims, positions, L)
-    >>> print(ql_sc)  # Minkowski structure metric for each particle
+    :returns: A 1D numpy array of size N, where each element represents the Minkowski structure metric (Steinhardt 
+              order parameter) of order L for the corresponding particle in the system.
+    :rtype: numpy.ndarray
+
+    :note: 
+        - The function uses the `freud.locality.Voronoi` class to compute the Voronoi tessellation and the 
+          `freud.order.Steinhardt` class to compute the Steinhardt order parameter.
+        - The Voronoi tessellation is used to identify the local neighborhood of each particle, and the Steinhardt 
+          order parameter describes how ordered that neighborhood is.
+        - The returned array contains the Steinhardt order parameter for each particle, quantifying the local 
+          symmetry around that particle. A higher value indicates a more ordered arrangement in the local environment.
+
+    :example:
+        >>> boxDims = [10, 10, 10]  # Box dimensions for a 3D system
+        >>> positions = np.random.rand(100, 3) * boxDims  # 100 random particle positions in 3D
+        >>> L = 6  # Steinhardt order parameter to calculate
+        >>> ql_sc = calculate_minkowski_q(boxDims, positions, L)
+        >>> print(ql_sc)  # Minkowski structure metric for each particle
     """
+
     if not isinstance(boxDims, np.ndarray):
         boxDims = np.array(boxDims)
     box = freud.box.Box(*boxDims)

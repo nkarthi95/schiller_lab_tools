@@ -15,44 +15,44 @@ from matplotlib import animation
 
 def write_vti(path, filename, d):
     """
-    Saves data as a .vti file in a specified directory.
+    Save data as a .vti file in a specified directory.
 
     This function converts all NumPy arrays in the input dictionary `d` 
     to Fortran order and saves them as point data in a .vti file using the 
     `imageToVTK` function. The file is saved in the specified directory 
     with the provided filename.
 
-    Parameters
-    ----------
-    path : str
+    :param path: 
         The directory path where the .vti file will be saved.
-    filename : str
+    :type path: str
+
+    :param filename: 
         The name of the .vti file to be created (without the `.vti` extension).
-    d : dict
+    :type filename: str
+
+    :param d: 
         A dictionary containing NumPy arrays with known key names. 
         Each array represents point data to be included in the .vti file.
+    :type d: dict
 
-    Returns
-    -------
-    int
+    :return: 
         Returns 1 to indicate the file has been saved successfully.
+    :rtype: int
 
-    Notes
-    -----
-    - All NumPy arrays in the dictionary are converted to Fortran order before saving.
-    - The .vti file is created using the `imageToVTK` function, with the dictionary 
-      data included as point data.
-    - The filename should not include the `.vti` extension as it is appended automatically.
+    :note: 
+        - All NumPy arrays in the dictionary are converted to Fortran order before saving.
+        - The .vti file is created using the `imageToVTK` function, with the dictionary 
+          data included as point data.
+        - The filename should not include the `.vti` extension as it is appended automatically.
 
-    Examples
-    --------
-    >>> import numpy as np
-    >>> d = {
-    ...     "temperature": np.random.rand(10, 10, 10),
-    ...     "pressure": np.random.rand(10, 10, 10)
-    ... }
-    >>> write_vti("/path/to/directory", "output_file", d)
-    1
+    :example:
+        >>> import numpy as np
+        >>> d = {
+        ...     "temperature": np.random.rand(10, 10, 10),
+        ...     "pressure": np.random.rand(10, 10, 10)
+        ... }
+        >>> write_vti("/path/to/directory", "output_file", d)
+        1
     """
     for i in d:
         d[i] = np.asfortranarray(d[i])
@@ -70,34 +70,34 @@ def animate_plot(x, y, interval=50):
 
     This function takes two lists of lists or numpy arrays representing the x and y 
     coordinates of data over multiple timesteps and generates an animated plot. The 
-    animation can be rendered in a Jupyter notebook using the `HTML` object.
+    animation can be rendered in a Jupyter notebook using the :class:`IPython.display.HTML` object.
 
-    Parameters
-    ----------
-    x : list of lists or numpy.ndarray
+    :param x: 
         The x-coordinates of the data, with shape (t, L), where t is the number 
         of timesteps and L is the length of data at each timestep.
-    y : list of lists or numpy.ndarray
+    :type x: list of lists or numpy.ndarray
+    :param y: 
         The y-coordinates of the data, with shape (t, L), where t is the number 
         of timesteps and L is the length of data at each timestep.
-    interval : int, optional
+    :type y: list of lists or numpy.ndarray
+    :param interval: 
         The delay in milliseconds between frames in the animation. Default is 50.
+    :type interval: int, optional
 
-    Returns
-    -------
-    matplotlib.animation.FuncAnimation
+    :return: 
         An animation object that can be rendered in a Jupyter notebook using 
-        `IPython.display.HTML`.
+        :class:`IPython.display.HTML`.
+    :rtype: matplotlib.animation.FuncAnimation
 
-    Examples
-    --------
-    >>> import numpy as np
-    >>> from IPython.display import HTML
-    >>> x = [np.linspace(0, 2 * np.pi, 100)] * 50
-    >>> y = [np.sin(xi + i * 0.1) for i, xi in enumerate(x)]
-    >>> ani = animate_plot(x, y, interval=100)
-    >>> HTML(ani.to_jshtml())
+    :examples:
+        >>> import numpy as np
+        >>> from IPython.display import HTML
+        >>> x = [np.linspace(0, 2 * np.pi, 100)] * 50
+        >>> y = [np.sin(xi + i * 0.1) for i, xi in enumerate(x)]
+        >>> ani = animate_plot(x, y, interval=100)
+        >>> HTML(ani.to_jshtml())
     """
+
     fig, ax = plt.subplots()
     ln, = plt.plot(x[0], y[0])
 
@@ -135,41 +135,44 @@ def animate_colormap(data, axs_labels=None, times=None, c_label=None, interval=5
 
     This function takes a 3D numpy array representing time-dependent 2D data and 
     generates an animated colormap. The animation can be rendered in a Jupyter 
-    notebook using the `HTML` object.
+    notebook using the :class:`IPython.display.HTML` object.
 
-    Parameters
-    ----------
-    data : numpy.ndarray
+    :param data: 
         A 3D array with shape (t, L, M), where t is the number of timesteps, 
         and L and M represent the dimensions of each data slice (e.g., rows and columns).
-    axs_labels : list of str, optional
+    :type data: numpy.ndarray
+    :param axs_labels: 
         A list of length 2 containing strings for the x-axis and y-axis labels, 
         in the 0th and 1st positions respectively. Default is None.
-    times : numpy.ndarray, optional
+    :type axs_labels: list of str, optional
+    :param times: 
         A 1D array of length t, where each value represents the time corresponding 
         to each timestep. Default is None.
-    c_label : str, optional
+    :type times: numpy.ndarray, optional
+    :param c_label: 
         A label for the colormap (color bar). Default is None.
-    interval : int, optional
+    :type c_label: str, optional
+    :param interval: 
         The delay in milliseconds between frames in the animation. Default is 50.
-    sz : int, optional
+    :type interval: int, optional
+    :param sz: 
         The size of the plot figure. Default is 5.
-    cm : str, optional
+    :type sz: int, optional
+    :param cm: 
         The colormap to use for the animation. Default is 'bwr'.
+    :type cm: str, optional
 
-    Returns
-    -------
-    matplotlib.animation.FuncAnimation
+    :return: 
         An animation object that can be rendered in a Jupyter notebook using 
-        `IPython.display.HTML`.
+        :class:`IPython.display.HTML`.
+    :rtype: matplotlib.animation.FuncAnimation
 
-    Examples
-    --------
-    >>> import numpy as np
-    >>> from IPython.display import HTML
-    >>> data = np.random.random((50, 100, 100))  # Example 3D array (50 timesteps, 100x100 grid)
-    >>> ani = animate_colormap(data, axs_labels=["X-axis", "Y-axis"], times=np.arange(50))
-    >>> HTML(ani.to_jshtml())
+    :examples:
+        >>> import numpy as np
+        >>> from IPython.display import HTML
+        >>> data = np.random.random((50, 100, 100))  # Example 3D array (50 timesteps, 100x100 grid)
+        >>> ani = animate_colormap(data, axs_labels=["X-axis", "Y-axis"], times=np.arange(50))
+        >>> HTML(ani.to_jshtml())
     """
     def init():
         img.set_data(data[0])
