@@ -260,3 +260,60 @@ def calculate_minkowski_q(boxDims, positions, L=6):
     ql_sc = ql.compute(sc_system, neighbors=voronoi_cells.nlist).particle_order
     return ql_sc
 
+
+# In[ ]:
+
+
+def calculate_minkowski_w(boxDims, positions, L=6):
+    """
+    Calculate the Minkowski structure metric of order L for each particle in the system.
+
+    This function computes the Minkowski structure metric (also known as the Steinhardt order parameter)
+    of order L for each particle in the system. It uses the Voronoi tessellation of the system to determine 
+    the local environment of each particle, and then calculates the Steinhardt order parameter to describe 
+    the local symmetry of the particle arrangements.
+
+    :param boxDims: A 1D array or list of length D representing the dimensions of the simulation box, 
+                    where D is the number of dimensions. The array should contain the box lengths along 
+                    each dimension (e.g., [Lx, Ly, Lz] for a 3D system).
+    :type boxDims: list or numpy.ndarray
+
+    :param positions: A 2D numpy array of shape (N, D) where N is the number of particles, and D is 
+                      the number of dimensions. Each row represents the position of a single particle 
+                      in the system.
+    :type positions: numpy.ndarray
+
+    :param L: The Steinhardt order parameter to compute. The order parameter quantifies the local symmetry 
+              of the particle arrangement, and higher orders (e.g., L=6) correspond to more detailed descriptions 
+              of the local symmetry. The default is L=6, which corresponds to the typical hexagonal or crystalline 
+              symmetry for many systems.
+    :type L: int, optional, default=6
+
+    :returns: A 1D numpy array of size N, where each element represents the Minkowski structure metric (Steinhardt 
+              order parameter) of order L for the corresponding particle in the system.
+    :rtype: numpy.ndarray
+
+    :note: 
+        - The function uses the `freud.locality.Voronoi` class to compute the Voronoi tessellation and the 
+          `freud.order.Steinhardt` class to compute the Steinhardt order parameter.
+        - The Voronoi tessellation is used to identify the local neighborhood of each particle, and the Steinhardt 
+          order parameter describes how ordered that neighborhood is.
+        - The returned array contains the Steinhardt order parameter for each particle, quantifying the local 
+          symmetry around that particle. A higher value indicates a more ordered arrangement in the local environment.
+
+    :example:
+        >>> boxDims = [10, 10, 10]  # Box dimensions for a 3D system
+        >>> positions = np.random.rand(100, 3) * boxDims  # 100 random particle positions in 3D
+        >>> L = 6  # Steinhardt order parameter to calculate
+        >>> ql_sc = calculate_minkowski_q(boxDims, positions, L)
+        >>> print(ql_sc)  # Minkowski structure metric for each particle
+    """
+
+    if not isinstance(boxDims, np.ndarray):
+        boxDims = np.array(boxDims)
+    box = freud.box.Box(*boxDims)
+    ql = freud.order.Steinhardt(L, wl = True)
+    sc_system = (box, positions)
+    ql_sc = ql.compute(sc_system, neighbors={"num_neighbors": L}).particle_order
+    return ql_sc
+
