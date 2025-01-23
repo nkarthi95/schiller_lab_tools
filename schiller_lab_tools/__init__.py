@@ -12,7 +12,7 @@ from .lb3d import read_hdf5, read_asc, rewrite_asc_file
 from .visualization import write_vti, animate_colormap, animate_plot
 from .droplet_analysis import droplet_radius, pressure_jump, inertia_tensor, gyration_tensor, deformation1, inclination_angle
 from .microstructure_analysis import structure_factor, spherically_averaged_structure_factor, spherical_first_moment, second_moment, interface_order, curvature, fill, label_regions_hk, get_pn, taufactor_tortuosity
-from .particle_analysis import calculate_average_cos_interface_normal, calculate_rdf, calculate_nematic_order, calculate_minkowski_q
+from .particle_analysis import calculate_average_cos_interface_normal, calculate_rdf, calculate_nematic_order, calculate_ql, calculate_wl
 
 # from .input_output import lb3d, visualization
 # from .microstructure import droplet_analysis, microstructure_analysis
