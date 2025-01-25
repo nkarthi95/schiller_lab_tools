@@ -266,7 +266,7 @@ def interface_order(phi):
 # In[7]:
 
 
-def curvature(phi, limit=(50, 1)):
+def curvature(phi, limit=(50, 1), step_size = 1):
     """
     Compute the Gaussian and mean curvatures, as well as the interface area, for a given order parameter.
 
@@ -284,6 +284,10 @@ def curvature(phi, limit=(50, 1)):
         Gaussian and mean curvatures, respectively. Only curvatures with absolute values less than these limits 
         will be returned. Default is `(50, 1)`.
     :type limit: tuple of float, optional
+
+    :param step_size:
+        An integer that specifies how coarse the squares to calculate the marching squared grid is.
+    :type step_size: integer, optional
 
     :return:
         A tuple containing:
@@ -305,7 +309,7 @@ def curvature(phi, limit=(50, 1)):
         >>> print(K.shape, H.shape, A)
     """
     # Use marching cubes to obtain isosurface mesh
-    verts, faces, normals, values = measure.marching_cubes(phi, 0)
+    verts, faces, normals, values = measure.marching_cubes(phi, 0, step_size = step_size)
     pmesh = pv.PolyData(verts, np.insert(faces, 0, 3, axis=1))
     
     K = pmesh.curvature(curv_type="gaussian")
