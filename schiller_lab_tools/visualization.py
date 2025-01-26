@@ -57,7 +57,7 @@ def write_vti(path, filename, d):
     for i in d:
         d[i] = np.asfortranarray(d[i])
     
-    imageToVTK(path, pointData=d)
+    imageToVTK(path + "/" + filename, pointData=d)
     return 1
 
 

@@ -15,6 +15,7 @@ from numba import njit
 import pyvista as pv
 import openpnm as op
 import porespy as ps
+import torch
 import taufactor as tau
 
 
@@ -540,7 +541,7 @@ def get_pn(phi, filter=None, sigma=0.4, r_max=8, voxel_size=1, boundary_width=3,
 # In[11]:
 
 
-def taufactor_tortuosity(phi, filter=None):
+def taufactor_tortuosity(phi, filter=None, device = "cpu", convergence_criteria = 0.05):
     """
     Calculates the tortuosity of a system along each axis and the average tortuosity across all axes.
 
@@ -558,6 +559,13 @@ def taufactor_tortuosity(phi, filter=None):
         and return a binary mask of the same shape. If not provided, the function will binarize `phi` by setting
         all positive values to 1 and all non-positive values to 0.
     :type filter: function, optional
+    :param device:
+        Tells pytorch whether to use a cpu or gpu implementation. Default is cpu
+    :type device: str, optional
+    :param convergence_criteria:
+        Tells the solver when to stop computation. Not sure how this value is used in the code, but the higher it is the
+        faster convergence takes place.
+    :type device: int, optional
 
     :return: 
         A numpy array of length 4 containing the tortuosity values along each axis and the average tortuosity, 
@@ -584,8 +592,8 @@ def taufactor_tortuosity(phi, filter=None):
     out = []
     profile_in = phi_bin.copy()
     for i in range(len(phi_bin.shape)):
-        s = tau.PeriodicSolver(profile_in)
-        s.solve()
+        s = tau.PeriodicSolver(profile_in, device=torch.device(device))
+        s.solve(conv_crit=convergence_criteria)
         out.append(s.tau.item())
         axes = np.roll(axes, shift=1)
         profile_in = np.transpose(phi_bin, axes)
