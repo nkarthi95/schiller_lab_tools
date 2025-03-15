@@ -265,7 +265,7 @@ def calculate_ql(boxDims, positions, L=6, voronoi = True, average = False, weigh
       neighbor_list = voronoi_cells.nlist
     else:
       ql = freud.order.Steinhardt(L, weighted=weighted, average=average)
-      neighbor_list = neighbors={"num_neighbors": L}
+      neighbor_list = {"num_neighbors": L}
 
     ql_sc = ql.compute(sc_system, neighbors=neighbor_list).particle_order
 
