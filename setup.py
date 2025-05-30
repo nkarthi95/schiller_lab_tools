@@ -16,7 +16,7 @@ setup(
         'Operating System :: OS Independent',
     ],
     python_requires='>=3.9',  # Specify your Python version requirement
-    install_requires=[
-        "numpy <= 2.0",
-    ]
+    # install_requires=[
+    #     "numpy <= 2.0",
+    # ]
 )

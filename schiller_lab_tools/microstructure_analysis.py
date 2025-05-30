@@ -6,9 +6,9 @@
 
 import numpy as np
 import scipy.fftpack as fft
+from scipy.ndimage import distance_transform_edt, convolve
 
-from skimage import measure, morphology
-from skimage import measure
+from skimage import measure, morphology, transform
 
 from numba import njit
 
@@ -402,7 +402,7 @@ def fill(field):
     return field
 
 
-# In[9]:
+# In[ ]:
 
 
 def label_regions_hk(phi, filter=None):
@@ -600,4 +600,509 @@ def taufactor_tortuosity(phi, filter=None, device = "cpu", convergence_criteria 
     
     out.append((out[0] + out[1] + out[2]) / 3)
     return np.array(out)
+
+
+# In[ ]:
+
+
+@njit
+def boxcar_avg(data, l = 1):
+    """
+    Performs a boxcar averaging on a 3D NumPy array.
+
+    The function computes the average value of neighboring cells within a given 
+    window size `l` for each element in the input array. It handles three cases:
+    interior portions, edges, and corners, using the modulo operator for periodic 
+    boundary conditions.
+
+    Parameters
+    ----------
+    data : numpy.ndarray
+        A 3D NumPy array representing the input data to be averaged.
+    l : int, optional
+        The number of cells to average over in each direction (default is 1).
+
+    Returns
+    -------
+    numpy.ndarray
+        A 3D NumPy array with the averaged values.
+
+    Notes
+    -----
+    - The function uses periodic boundary conditions to handle edges and corners.
+    - The function does not modify the input array.
+    - It utilizes a simple brute-force approach for averaging.
+    """
+    nx, ny, nz = data.shape
+    smoothed = np.empty(data.shape)
+    for i in range(0, nx):
+        for j in range(0, ny):
+            for k in range(0, nz):      
+                sum_data = 0.0
+
+                sum_data += data[i,j,k]
+                # nearest neighbor x
+                sum_data += data[(i-1)%nx, j, k]
+                sum_data += data[(i+1)%nx, j, k]
+                # nearest neighbor y
+                sum_data += data[i, (j-1)%ny, k]
+                sum_data += data[i, (j+1)%ny, k]
+                # nearest neighbor z
+                sum_data += data[i, j, (k-1)%nz]
+                sum_data += data[i, j, (k+1)%nz]
+                
+                smoothed[i, j, k] = sum_data/7
+    
+    return smoothed
+
+
+# In[ ]:
+
+
+def calculate_enclosed_voids(labelled_array, nvoids_total):
+    """
+    Count the number of fully enclosed voids in a labeled 3D array.
+
+    This function identifies and counts void regions that do not touch the boundary
+    of the input volume. It assumes that void regions have been previously labeled
+    using a connected-component labeling algorithm.
+
+    Parameters
+    ----------
+    labelled_array : ndarray
+        A 3D NumPy array where each connected void region is labeled with a unique
+        integer (typically from `scipy.ndimage.label` or `skimage.measure.label`).
+    nvoids_total : int
+        The total number of labeled void regions in the array.
+
+    Returns
+    -------
+    num_internal_voids : int
+        The number of void regions that are completely enclosed within the volume
+        (i.e., they do not touch any of the array boundaries).
+
+    Notes
+    -----
+    - Background should be labeled as 0 in the `labelled_array`.
+    - This function assumes 6-connectivity unless the labeling function was called with different connectivity.
+    - A void is considered "enclosed" only if none of its voxels touch any of the six faces of the volume.
+    """
+    border_labels = set()
+    border_labels.update(np.unique(labelled_array[0, :, :]))
+    border_labels.update(np.unique(labelled_array[-1, :, :]))
+    border_labels.update(np.unique(labelled_array[:, 0, :]))
+    border_labels.update(np.unique(labelled_array[:, -1, :]))
+    border_labels.update(np.unique(labelled_array[:, :, 0]))
+    border_labels.update(np.unique(labelled_array[:, :, -1]))
+
+    all_labels = set(range(1, nvoids_total + 1))
+    internal_voids = all_labels - border_labels
+    num_internal_voids = len(internal_voids)
+    return num_internal_voids
+
+
+# In[ ]:
+
+
+def calculate_voids(box, level = 0):
+    array_bin = measure.label(np.where(box > level, 1, 0))
+    box_inv = ~array_bin
+    regions, r = measure.label(box_inv, return_num=True, connectivity=1)
+    voids = calculate_enclosed_voids(regions, r)
+
+    return voids
+
+
+# In[ ]:
+
+
+def meshify(volume_field, level, decimate_prop = 0.7, method = 'marching_cubes'):
+    grid = pv.ImageData(dimensions = volume_field.shape)
+    pmesh = grid.contour([level], volume_field.flatten(order = "F"), method = method)
+    pmesh.decimate(decimate_prop, inplace = True)
+    pmesh.triangulate(inplace = True)
+    return pmesh
+
+
+# In[ ]:
+
+
+def from_mesh(array, level, decimate_prop, epsilon = 0.5):
+    """
+    Estimate topological and geometric properties from an isosurface mesh using PyVista.
+
+    This function extracts a surface mesh from a 3D scalar field using the marching cubes
+    algorithm and calculates the genus, number of handles, number of enclosed voids, and 
+    surface area. It uses mesh-based estimates of Euler characteristic and optionally 
+    applies mesh decimation to reduce complexity.
+
+    Parameters
+    ----------
+    array : ndarray
+        A 3D NumPy array representing the scalar field or volume data.
+    level : float
+        The isosurface level (threshold) used to extract the surface mesh.
+    decimate_prop : float, optional
+        Proportion of the mesh to reduce during decimation (default is 0.8). This value 
+        should be between 0 (no reduction) and 1 (maximum reduction).
+    epsilon: float, optional
+        Sets the boundary padding layer value. Constant value per level set to create a smooth
+        transition to the edge of the box. Defaults to 0.5
+
+    Returns
+    -------
+    g : float
+        The genus of the surface, estimated from a mesh-based Euler-Poincaré formula.
+    handles : float
+        The number of handles in the structure, calculated as genus + number of enclosed voids.
+    voids : int
+        The number of fully enclosed voids (regions that do not touch the array boundary).
+    surface_area : float
+        The surface area of the extracted and decimated isosurface mesh.
+
+    Notes
+    -----
+    - The mesh is generated using PyVista’s `ImageData.contour` method with marching cubes.
+    - The function assumes unit-valued data where the isosurface separates material from void.
+    - `calculate_enclosed_voids` is a required helper function that detects non-boundary-connected voids.
+    - Edge count is estimated assuming triangular faces (`e = 1.5 * f`), which holds for manifold triangle meshes.
+
+    """
+    array_pad = np.pad(array, pad_width = 1, mode = 'constant', constant_values = level - epsilon)
+    pmesh = meshify(array_pad, level, decimate_prop = decimate_prop, method = 'marching_cubes')
+
+    v = pmesh.n_points
+    f = pmesh.n_faces_strict
+    e = 1.5*f
+
+    EP = v + f - e
+    g = 1 - EP/2
+    surface_area = pmesh.area
+
+    voids = calculate_voids(array, level = level)
+    handles = g + voids
+
+    return g, handles, voids, surface_area
+
+
+# In[ ]:
+
+
+def from_region_props(array, level):
+    """
+    Compute topological and geometric properties of a level set surface from a 3D scalar field.
+
+    This function calculates the genus, number of handles, number of enclosed voids,
+    and surface area of the isosurface extracted from a 3D array at a given isovalue level.
+    It uses region properties for Euler number estimation and marching cubes for surface extraction.
+
+    Parameters
+    ----------
+    array : ndarray
+        A 3D NumPy array representing the scalar field or volume data.
+    level : float
+        The isosurface level (threshold) used to extract the surface and compute region properties.
+    step_size : int
+        Step size used in the marching cubes algorithm. Smaller values yield higher resolution.
+
+    Returns
+    -------
+    g : float
+        The genus of the structure, calculated from the Euler-Poincare characteristic.
+    handles : float
+        The number of handles in the structure, calculated as genus + number of enclosed voids.
+    voids : int
+        The number of fully enclosed void regions that do not touch the boundary.
+    surface_area : float
+        The surface area of the extracted isosurface.
+
+    Notes
+    -----
+    - The function assumes unit voxel spacing in all dimensions.
+    - The input array should represent a scalar field where isosurfaces define material boundaries.
+    - A helper function `calculate_enclosed_voids` is required to compute the number of enclosed voids.
+    """
+
+    array_bin = measure.label(np.where(array > level, 1, 0))
+    box = ~array_bin
+
+    _, c = measure.label(~box, return_num=True, connectivity=3)
+    EP = measure.euler_number(~box, connectivity=3)
+    g = c - EP
+
+    regions, r = measure.label(box, return_num=True, connectivity=1)
+    v = calculate_voids(regions, r)
+
+    h = g + v
+
+    verts, faces, _, _ = measure.marching_cubes(array, level = level)
+    surface_area = measure.mesh_surface_area(verts, faces)
+
+    return g, h, v, surface_area
+
+
+# In[ ]:
+
+
+def calculate_genus_handles_surface_area(array, level = 0, method = 'region_props', decimate_prop = 0.95):
+    """
+    Computes the mathematical genus, number of handles/channels, and surface area 
+    of an isosurface within a 3D NumPy array.
+
+    The function applies the marching cubes algorithm to extract the surface at 
+    the given isosurface level and computes:
+    
+    - **Genus (g)**: A topological invariant representing the number of holes in the surface.
+    - **Handles (h)**: The number of independent loops or channels within the structure.
+    - **Surface Area (A)**: The total surface area of the extracted isosurface.
+
+    Parameters
+    ----------
+    array : numpy.ndarray
+        A 3D NumPy array representing the input volumetric data.
+    level : float, optional
+        The isosurface level to extract from the array (default is 0).
+    step_size : int, optional
+        The step size for the marching cubes algorithm, controlling the resolution 
+        of the extracted surface (default is 1).
+    method: str, optional
+        Specifying the method used to calculate the output parameters. Options are
+        'region_props'(default) and 'mesh'.
+    Returns
+    -------
+    tuple
+        A tuple containing:
+        - **g (float)**: The genus of the surface.
+        - **handles (float)**: The number of handles or channels in the surface.
+        - **surface_area (float)**: The computed surface area.
+
+    Notes
+    -----
+    - The function uses `measure.marching_cubes` from `skimage` to extract the surface mesh.
+    - `pv.PolyData` (PyVista) is used to analyze the mesh and compute edges.
+    - The genus is calculated using Euler-Poincaré formula: `EP = V - E + F`, where
+      `V` is the number of vertices, `E` is the number of edges, and `F` is the number of faces.
+    - The number of voids (separate enclosed regions) is determined using `measure.label`.
+    """
+    g = 0
+    handles = 0
+    surface_area = 0
+
+    if method == 'mesh':
+        g, handles, voids, surface_area = from_mesh(array, level, decimate_prop)
+    elif method == 'region_props':
+        g, handles, voids, surface_area = from_region_props(array, level)
+    else:
+        raise ValueError(f"{method} is invalid. Please use either mesh or region_props options")
+
+    return g, handles, voids, surface_area
+
+
+# In[ ]:
+
+
+def create_euclidean_distance_transform(phi):
+    """
+    Computes the Euclidean distance transform of a 3D emulsion surface.
+
+    The function calculates the signed Euclidean distance of each point in the 
+    input array `phi` to the interface between phases. Positive distances 
+    correspond to points in the phase where `phi >= 0`, while negative distances 
+    correspond to points where `phi <= 0`.
+
+    Parameters
+    ----------
+    phi : numpy.ndarray
+        A 3D NumPy array representing the emulsion surface.
+
+    Returns
+    -------
+    numpy.ndarray
+        A 3D NumPy array of the same shape as `phi`, where each element contains 
+        the Euclidean distance to the nearest interface. Positive values indicate 
+        distances inside the `phi >= 0` region, and negative values indicate 
+        distances inside the `phi <= 0` region.
+
+    Notes
+    -----
+    - The function uses `distance_transform_edt` from `scipy.ndimage` to compute 
+      the Euclidean distance transform.
+    - The interface is determined by binarizing the input array into two regions:
+      one where `phi >= 0` and another where `phi <= 0`.
+    - Signed distances are assigned accordingly, with positive distances inside 
+      the `phi >= 0` region and negative distances inside the `phi <= 0` region.
+    """
+    phi_edt = np.empty(phi.shape)
+
+    # phi_bin_pos = label_regions_hk(phi, lambda x: np.where(x >= 0, 1, 0))
+    # phi_bin_neg = label_regions_hk(phi, lambda x: np.where(x <= 0, 1, 0))
+    phi_bin_pos = np.where(phi >= 0, 1, 0)
+    phi_bin_neg = np.where(phi < 0, 1, 0)
+
+    phi_edt_pos = distance_transform_edt(phi_bin_pos)
+    phi_edt_neg = distance_transform_edt(phi_bin_neg)
+
+    idxs = np.where(phi >= 0)
+    phi_edt[idxs] = phi_edt_pos[idxs]
+    idxs = np.where(phi < 0)
+    phi_edt[idxs] = -phi_edt_neg[idxs]
+
+    return phi_edt
+
+
+# In[ ]:
+
+
+@njit
+def gradient_upwind_3d(phi, indicator, dx):
+    nx, ny, nz = phi.shape
+    grad = np.empty((nx, ny, nz))
+
+    for i in range(nx):
+        for j in range(ny):
+            for k in range(nz):
+                x = i%nx
+                y = j%ny
+                z = k%nz
+
+                # Forward/backward differences in x
+                x_forward = (i+1)%nx
+                x_backward = (i-1)%nx
+                phi_x_forward = (phi[x_forward,y,z] - phi[x,y,z])/dx
+                phi_x_backward = (phi[x,y,z] - phi[x_backward,y,z])/dx
+                phi_x_p = np.maximum(phi_x_backward, 0)**2 + np.minimum(phi_x_forward, 0)**2
+                phi_x_m = np.minimum(phi_x_backward, 0)**2 + np.maximum(phi_x_forward, 0)**2
+
+                # Forward/backward differences in y
+                y_forward = (j+1)%ny
+                y_backward = (j-1)%ny
+                phi_y_forward = (phi[x, y_forward,z] - phi[x,y,z])/dx
+                phi_y_backward = (phi[x,y,z] - phi[x, y_backward,z])/dx
+                phi_y_p = np.maximum(phi_y_backward, 0)**2 + np.minimum(phi_y_forward, 0)**2
+                phi_y_m = np.minimum(phi_y_backward, 0)**2 + np.maximum(phi_y_forward, 0)**2
+
+                # Forward/backward differences in z
+                z_forward = (k+1)%nz
+                z_backward = (k-1)%nz
+                phi_z_forward = (phi[x,y,z_forward] - phi[x,y,z])/dx
+                phi_z_backward = (phi[x,y,z] - phi[x,y,z_backward])/dx
+                phi_z_p = np.maximum(phi_z_backward, 0)**2 + np.minimum(phi_z_forward, 0)**2
+                phi_z_m = np.minimum(phi_z_backward, 0)**2 + np.maximum(phi_z_forward, 0)**2
+
+                # Magnitude of gradient
+                if indicator[x,y,z] >= 0:
+                    grad[x,y,z] = np.sqrt(phi_x_p + phi_y_p + phi_z_p)
+                else:
+                    grad[x,y,z] = np.sqrt(phi_x_m + phi_y_m + phi_z_m)
+    
+    return grad
+
+
+# In[ ]:
+
+
+def reinitialize_3d(phi0, dx=1.0, dt=0.1, iterations=1000, max_error = 1e-8, epsilon = 1e-6):
+    phi = phi0.copy()
+    sign_phi0 = phi0/np.sqrt(phi0**2 + epsilon**2)
+    errors = []
+    
+    curr_ite = 0
+    curr_err = 1
+
+    while curr_ite <= iterations:
+        grad = gradient_upwind_3d(phi, sign_phi0, dx)
+        phi_new = phi - dt*sign_phi0*(grad - 1)
+
+        curr_err = np.mean(np.abs(phi_new - phi))
+        errors.append(curr_err)
+        phi = phi_new
+        
+        if curr_err < max_error:
+            break
+
+        curr_ite += 1
+    
+    return phi, errors
+
+
+# In[ ]:
+
+
+def calc_csd(phi_edt, l = 1, nbins = None, method = "region_props", decimate_prop = 0.7):
+    """
+    Computes the channel size distribution (CSD) in a binary fluid system.
+
+    This function calculates the CSD by determining the genus and number of handles 
+    of the structure across different normalized radii, following the method described 
+    in the paper: https://doi.org/10.1016/j.actamat.2011.12.042.
+
+    Parameters
+    ----------
+    phi_edt : numpy.ndarray
+        A 3D NumPy array representing the distance transform of an order parameter of a binary fluid system.
+    l : int, optional
+        The number of grid points to average over when computing the distance transform. (Default is 3)
+    nbins : int, optional
+        Number of bins used to calculate topology of distance from the interface (default is None which sets bin width to 1).
+    step_size : int, optional
+        The step size used in the marching cubes algorithm to extract surface information (default is 4).
+    method: str, optional
+        Specifies which method to use for the genus calculation algorithm. Options are 'region_props'(default) and 'mesh'.
+    Returns
+    -------
+    tuple
+        A tuple containing:
+        - **radii_norm (numpy.ndarray)**: Normalized radii values ranging from 0 to 1.
+        - **gv (numpy.ndarray)**: Genus density values as a function of the normalized radii.
+        - **hv (numpy.ndarray)**: Handle density values as a function of the normalized radii.
+        - **voids (numpy.ndarray)**: Number of voids in the system as a function of the normalized radii.
+
+    Notes
+    -----
+    - The genus (g) and number of handles (h) are calculated at different radii using 
+      `calculate_genus_handles_surface_area()`, with normalized distances.
+    - A boxcar averaging filter is applied based on a convolution.
+    - The genus and handle densities are normalized by the system volume and surface area density.
+    - The final values are computed symmetrically for positive values only. Structure is assumed to be symmetric.
+    """
+
+    if l is not None:
+        if l == 1:
+            edt_in = boxcar_avg(phi_edt, l = 1)
+        else:
+            kernel = np.ones((2*l + 1, 2*l + 1, 2*l + 1))
+            edt_in = convolve(phi_edt, kernel, mode = "wrap")/np.prod(kernel.shape)
+    else:
+        edt_in = phi_edt
+
+    V = np.prod(edt_in.shape)
+    _, _, _, A = calculate_genus_handles_surface_area(edt_in, level = 0, method = "region_props")
+    # print(A)
+    sigma = A/V
+    factor = V*np.power(sigma, 3)
+
+    # lmax = 1/(sigma)
+    # print(lmax)
+    lmax = np.amin(edt_in.shape)//2
+    if nbins is None:
+        distance = np.arange(0, np.ceil(lmax), 1, dtype = float)
+    else:
+        distance = np.linspace(0, lmax, nbins, dtype = float)
+
+    gv = np.zeros_like(distance)
+    hv = np.zeros_like(distance)
+    voids = np.zeros_like(distance)
+
+    for i, c in enumerate(distance):
+        if c <= edt_in.max():
+            # print(c)
+            g, h, v, A =calculate_genus_handles_surface_area(edt_in, c, method = method, decimate_prop=decimate_prop)
+            # if g > 0:
+            gv[i] += g#/factor
+            hv[i] += h#/factor
+            voids[i] = v
+        else:
+            continue
+
+    return distance, gv, hv, voids
 
