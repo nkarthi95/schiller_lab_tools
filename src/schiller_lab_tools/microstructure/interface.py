@@ -327,3 +327,81 @@ def calc_csd(phi_edt, l = 1, nbins = None, method = "region_props", decimate_pro
             continue
 
     return distance, gv, hv, voids
+
+def calculate_average_cos_interface_normal(phi, positions, orientations, step_size=1, cutoff=7.9):
+    """
+    Calculates the angle between particle orientations and the interface normal for particles near the interface.
+
+    This function uses the marching cubes algorithm to identify the interface in a 3D field represented by `phi` 
+    and calculates the angle between the particle orientation and the normal to the interface for particles that 
+    are within a specified distance (`cutoff`) from the interface. It returns the angles for particles near the 
+    interface and the number of particles that are not within the cutoff distance.
+
+    :param phi: 
+        A 3D numpy array representing the binary density field of two phases (fluid or otherwise). The marching 
+        cubes algorithm is applied to identify the interface between the phases.
+    :type phi: numpy.ndarray
+    :param positions: 
+        A 2D numpy array of shape (n, D), where `n` is the number of particles and `D` is the number of dimensions 
+        of the system. Each row represents the position of a particle in the system.
+    :type positions: numpy.ndarray
+    :param orientations: 
+        A 2D numpy array of shape (n, D), where `n` is the number of particles and `D` is the number of dimensions. 
+        Each row represents the orientation vector of a particle.
+    :type orientations: numpy.ndarray
+    :param step_size: 
+        The grid size for the marching cubes algorithm. A smaller value will produce more accurate results, but may 
+        increase computation time. Default is 1.
+    :type step_size: int, optional
+    :param cutoff: 
+        The maximum distance a particle can be from the interface to be considered for angle calculation. Particles 
+        farther than this distance from the interface are excluded. Default is 7.9.
+    :type cutoff: float, optional
+
+    :return: 
+        A tuple containing:
+        - `theta`: A 1D numpy array of shape (m,) containing the angles (in degrees) between the particle orientations 
+          and the normal to the interface for all particles that are within the specified `cutoff` distance from the interface.
+        - `mask`: A 1D numpy array containing the indices of the particles that are not within the `cutoff` distance 
+          from the interface.
+    :rtype: tuple (numpy.ndarray, numpy.ndarray)
+
+    :notes: 
+        - The marching cubes algorithm is used to extract the interface (isosurface) from the `phi` field.
+        - The angle between each particle's orientation and the normal to the interface is calculated using the dot product, 
+          and the result is converted from radians to degrees.
+        - Particles with a center-to-interface distance greater than `cutoff` are excluded from the angle calculation.
+        - The output `theta` contains the angles in degrees, and the returned `mask` indicates which particles were excluded 
+          based on their distance from the interface.
+
+    :examples: 
+        >>> phi = np.random.randn(100, 100, 100)  # Example binary field
+        >>> positions = np.random.rand(10, 3) * 100  # Random positions for 10 particles
+        >>> orientations = np.random.rand(10, 3)  # Random orientations for 10 particles
+        >>> theta, mask = calculate_average_cos_interface_normal(phi, positions, orientations)
+        >>> print(theta)  # Angles of particles near the interface
+        >>> print(mask)   # Indices of particles not near the interface
+    """
+
+    v, f, n, vals = marching_cubes(phi, 0, step_size=step_size)  # verts, faces, normals, values
+
+    distances = np.zeros(orientations.shape[0])
+    theta = np.zeros(orientations.shape[0])
+
+    for i in range(orientations.shape[0]):
+        curr_pos = positions[i]
+        part_norm = orientations[i]
+
+        part_to_int_distance = np.linalg.norm(curr_pos - v, axis=-1)
+        idx_norm = np.argsort(part_to_int_distance)[0]
+        distances[i] = part_to_int_distance[idx_norm]
+        int_norm = n[idx_norm]
+
+        angle = np.dot(part_norm, int_norm) / (np.linalg.norm(part_norm) * np.linalg.norm(int_norm))
+        angle = np.arccos(angle) * 180 / np.pi
+        theta[i] = 180 - angle if angle > 90 else angle
+
+    mask = np.where(distances >= cutoff)
+    theta = np.delete(theta, mask)
+
+    return theta, mask[0]

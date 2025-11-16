@@ -1,156 +1,6 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[1]:
-
-
 import numpy as np
-import pandas as pd
-import itertools
 import freud
-from scipy.optimize import curve_fit
-from skimage import transform, measure
-
-
-# In[2]:
-
-
-def calculate_average_cos_interface_normal(phi, positions, orientations, step_size=1, cutoff=7.9):
-    """
-    Calculates the angle between particle orientations and the interface normal for particles near the interface.
-
-    This function uses the marching cubes algorithm to identify the interface in a 3D field represented by `phi` 
-    and calculates the angle between the particle orientation and the normal to the interface for particles that 
-    are within a specified distance (`cutoff`) from the interface. It returns the angles for particles near the 
-    interface and the number of particles that are not within the cutoff distance.
-
-    :param phi: 
-        A 3D numpy array representing the binary density field of two phases (fluid or otherwise). The marching 
-        cubes algorithm is applied to identify the interface between the phases.
-    :type phi: numpy.ndarray
-    :param positions: 
-        A 2D numpy array of shape (n, D), where `n` is the number of particles and `D` is the number of dimensions 
-        of the system. Each row represents the position of a particle in the system.
-    :type positions: numpy.ndarray
-    :param orientations: 
-        A 2D numpy array of shape (n, D), where `n` is the number of particles and `D` is the number of dimensions. 
-        Each row represents the orientation vector of a particle.
-    :type orientations: numpy.ndarray
-    :param step_size: 
-        The grid size for the marching cubes algorithm. A smaller value will produce more accurate results, but may 
-        increase computation time. Default is 1.
-    :type step_size: int, optional
-    :param cutoff: 
-        The maximum distance a particle can be from the interface to be considered for angle calculation. Particles 
-        farther than this distance from the interface are excluded. Default is 7.9.
-    :type cutoff: float, optional
-
-    :return: 
-        A tuple containing:
-        - `theta`: A 1D numpy array of shape (m,) containing the angles (in degrees) between the particle orientations 
-          and the normal to the interface for all particles that are within the specified `cutoff` distance from the interface.
-        - `mask`: A 1D numpy array containing the indices of the particles that are not within the `cutoff` distance 
-          from the interface.
-    :rtype: tuple (numpy.ndarray, numpy.ndarray)
-
-    :notes: 
-        - The marching cubes algorithm is used to extract the interface (isosurface) from the `phi` field.
-        - The angle between each particle's orientation and the normal to the interface is calculated using the dot product, 
-          and the result is converted from radians to degrees.
-        - Particles with a center-to-interface distance greater than `cutoff` are excluded from the angle calculation.
-        - The output `theta` contains the angles in degrees, and the returned `mask` indicates which particles were excluded 
-          based on their distance from the interface.
-
-    :examples: 
-        >>> phi = np.random.randn(100, 100, 100)  # Example binary field
-        >>> positions = np.random.rand(10, 3) * 100  # Random positions for 10 particles
-        >>> orientations = np.random.rand(10, 3)  # Random orientations for 10 particles
-        >>> theta, mask = calculate_average_cos_interface_normal(phi, positions, orientations)
-        >>> print(theta)  # Angles of particles near the interface
-        >>> print(mask)   # Indices of particles not near the interface
-    """
-
-    v, f, n, vals = measure.marching_cubes(phi, 0, step_size=step_size)  # verts, faces, normals, values
-
-    distances = np.zeros(orientations.shape[0])
-    theta = np.zeros(orientations.shape[0])
-
-    for i in range(orientations.shape[0]):
-        curr_pos = positions[i]
-        part_norm = orientations[i]
-
-        part_to_int_distance = np.linalg.norm(curr_pos - v, axis=-1)
-        idx_norm = np.argsort(part_to_int_distance)[0]
-        distances[i] = part_to_int_distance[idx_norm]
-        int_norm = n[idx_norm]
-
-        angle = np.dot(part_norm, int_norm) / (np.linalg.norm(part_norm) * np.linalg.norm(int_norm))
-        angle = np.arccos(angle) * 180 / np.pi
-        theta[i] = 180 - angle if angle > 90 else angle
-
-    mask = np.where(distances >= cutoff)
-    theta = np.delete(theta, mask)
-
-    return theta, mask[0]
-
-
-# In[3]:
-
-
-def calculate_rdf(boxDims, positions):
-    """
-    Calculate the radial distribution function (RDF) for a system of particles.
-
-    This function computes the radial distribution function (g(r)) for a system of particles, 
-    using the freud library's RDF implementation. The RDF is calculated by determining the 
-    density of particles as a function of distance from a reference particle. The function 
-    returns the radii `r_s` and the normalized densities `g_r` for the system.
-
-    :param boxDims: 
-        A 1D numpy array of length D representing the dimensions of the simulation box. The values 
-        in the array correspond to the size of the box along each dimension (e.g., [Lx, Ly, Lz] for a 
-        3D system).
-    :type boxDims: numpy.ndarray
-    :param positions: 
-        A 2D numpy array of shape (N, D) representing the positions of the particles in the system, 
-        where N is the number of particles and D is the number of dimensions (e.g., 3 for a 3D system).
-    :type positions: numpy.ndarray
-
-    :return: 
-        A tuple containing:
-        - `r_s`: A 1D numpy array of the radii (bin edges) used in the RDF calculation. These represent 
-        the radial distances from a reference particle.
-        - `g_r`: A 1D numpy array of the normalized radial distribution function, which represents the 
-        density of particles as a function of distance from a reference particle.
-    :return type: tuple (numpy.ndarray, numpy.ndarray)
-
-    :notes: 
-        - The `r_max` parameter is calculated as the ceiling of `np.min(boxDims) * np.sqrt(3) / 4`, 
-        which provides an estimate for the maximum radial distance used in the RDF calculation.
-        - The function uses the `freud.density.RDF` class from the freud library to perform the RDF computation.
-        - The radial distribution function is normalized such that `g_r = 1` for an ideal gas.
-        - The output `r_s` represents the bin edges, and `g_r` represents the density at each corresponding 
-        radial distance.
-
-    :examples: 
-        >>> boxDims = np.array([10.0, 10.0, 10.0])  # Simulation box dimensions in 3D
-        >>> positions = np.random.rand(1000, 3) * boxDims  # Random particle positions in 3D
-        >>> r_s, g_r = calculate_rdf(boxDims, positions)
-        >>> print(r_s)  # Radii used in the RDF calculation
-        >>> print(g_r)  # Normalized radial distribution function values
-    """
-
-    L = np.amin(boxDims)
-    r_max = int(np.ceil(np.min(boxDims) * np.sqrt(3) / 4))
-    rdf = freud.density.RDF(bins=r_max, r_max=r_max)
-    rdf.compute(system=(boxDims, positions), reset=False)
-    r_s = rdf.bin_edges[:-1]
-    g_r = rdf.rdf
-    return r_s, g_r
-
-
-# In[4]:
-
+from scipy.optimize import brute, fmin
 
 def calculate_nematic_order(orientations, director=[0, 0, 1]):
   """
@@ -200,10 +50,6 @@ def calculate_nematic_order(orientations, director=[0, 0, 1]):
   nematic = freud.order.Nematic(director)
   nematic.compute(orientations)
   return nematic.order
-
-
-# In[5]:
-
 
 def calculate_ql(boxDims, positions, L=6, voronoi = True, average = False, weighted = False):
     """
@@ -271,10 +117,6 @@ def calculate_ql(boxDims, positions, L=6, voronoi = True, average = False, weigh
 
     return ql_sc
 
-
-# In[ ]:
-
-
 def calculate_wl(boxDims, positions, L=6, normalize=False):
     """
     Calculate the Steinhardt order parameter :math:`w_l` for each particle in a simulation box.
@@ -323,3 +165,23 @@ def calculate_wl(boxDims, positions, L=6, normalize=False):
     wl_sc = wl.compute(sc_system, neighbors={"num_neighbors": L}).particle_order
     return wl_sc
 
+def calculate_smectic_order(particle_positions, nematic_director, layer_thickness_range):
+    def calc_smectic(d, director, pos):
+        return -(
+            np.absolute(np.sum(np.exp(np.dot(director, pos.T) * 2 * np.pi * 1j / d)))
+        ) / len(pos)
+    
+    director = nematic_director/np.linalg.norm(nematic_director)
+    
+    maximal_d = brute(
+        calc_smectic,  # function to optimize
+        ranges=(
+            layer_thickness_range,
+        ),  # range of values for optimization, these depend on the size of the particles in the direction of orientation
+        args=(director, particle_positions),  # arguments to pass to calc_smectic
+        finish=fmin,  # use Nelder-Mead to refine the brute force result
+    )[0]
+
+    smec = -calc_smectic(maximal_d, director, particle_positions)
+
+    return smec, maximal_d
