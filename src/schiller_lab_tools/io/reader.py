@@ -1,15 +1,6 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[1]:
-
-
 import h5py
 import numpy as np
 import pandas as pd
-
-
-# In[2]:
 
 
 def read_hdf5(filename):
@@ -50,10 +41,6 @@ def read_hdf5(filename):
     except:
         data = 0
     return data
-
-
-# In[3]:
-
 
 def read_asc(path, headers=None):
     """
@@ -125,10 +112,6 @@ def read_asc(path, headers=None):
     md_df = pd.DataFrame(d)
     return md_df, t
 
-
-# In[4]:
-
-
 def rewrite_asc_file(path):
     """
     Rewrites an ASC file to ensure it is in a NumPy-parsable format.
@@ -179,4 +162,3 @@ def rewrite_asc_file(path):
             r.write(line + '\n')
 
     return 1
-
