@@ -17,7 +17,6 @@ documentation for details.
 
    api/io
    api/microstructure
-   api/particles
    api/visualization
    api/data
    api/particle_properties

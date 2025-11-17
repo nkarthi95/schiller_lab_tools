@@ -63,11 +63,12 @@ def read_asc(path, headers=None):
     -----
     If no headers are provided, default headers are inferred from the
     number of columns:
-        * 13 columns → ['x','y','z','v_x','v_y','v_z','o_x','o_y','o_z',
-                        'w_x','w_y','w_z','p_id']
-        * More than 13 columns → ['x','y','z','v_x','v_y','v_z','o_x','o_y','o_z',
-                                  'w_x','w_y','w_z','Fb_x','Fb_y','Fb_z',
-                                  't_x','t_y','t_z','p_id']
+    
+    * 13 columns → ['x','y','z','v_x','v_y','v_z','o_x','o_y','o_z',
+                    'w_x','w_y','w_z','p_id']
+    * More than 13 columns → ['x','y','z','v_x','v_y','v_z','o_x','o_y','o_z',
+                              'w_x','w_y','w_z','Fb_x','Fb_y','Fb_z',
+                              't_x','t_y','t_z','p_id']
     Empty ASC files trigger creation of a default DataFrame with these
     headers and zero-filled values.
 
