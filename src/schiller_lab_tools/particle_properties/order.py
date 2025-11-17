@@ -2,102 +2,97 @@ import numpy as np
 import freud
 from scipy.optimize import brute, fmin
 
-def calculate_nematic_order(orientations, director=[0, 0, 1]):
+def calculate_nematic_order(orientations, director=None):
   """
-  Calculate the nematic order parameter for a system of particles.
+  Compute the nematic order parameter for a system of particle orientations.
 
-  This function computes the nematic order parameter, which measures the degree of alignment 
-  of the particles in a given direction, referred to as the director. The director is typically 
-  chosen to be a vector that represents the preferred direction of alignment in the system, 
-  and the nematic order quantifies how well the particle orientations are aligned with this 
-  direction.
+  Parameters
+  ----------
+  orientations : ndarray of shape (N, D)
+      Orientation vectors for ``N`` particles in ``D`` dimensions.
+  director : array_like of shape (D,), optional
+      Reference direction used to evaluate alignment. Defaults to the
+      unit vector along the z-axis ``[0, 0, 1]``.
 
-  :param orientations: 
-      A 2D numpy array of shape (N, D) representing the orientations of the particles, where 
-      N is the number of particles and D is the number of dimensions. Each row contains the 
-      orientation vector of a single particle in the system.
-  :type orientations: numpy.ndarray
-  :param director: 
-      A 1D array or list of length D representing the director vector along which the nematic 
-      order is computed. This vector specifies the preferred direction of alignment in the system. 
-      If not provided, the default is the unit vector along the z-axis, i.e., [0, 0, 1].
-      :default: [0, 0, 1]
-  :type director: list or numpy.ndarray, optional
+  Returns
+  -------
+  float
+      Nematic order parameter. Values near 1 indicate strong alignment
+      with the director; 0 corresponds to no net alignment; -0.5
+      corresponds to orthogonal anti-alignment.
 
-  :return: 
-      The nematic order parameter of the system, which quantifies the alignment of the particle 
-      orientations with the director. Values of 1, 0, and -0.5 indicate perfect alignment, no alignment, 
-      and opposite orthogonal alignment respectively.
-  :return type: float
+  Notes
+  -----
+  The computation uses ``freud.order.Nematic`` to evaluate alignment of
+  particle orientations relative to the supplied director. The director
+  is interpreted as the preferred axis of orientation, as in liquid-crystal
+  or elongated-particle systems. Positive values indicate alignment along
+  the director, negative values indicate alignment opposite or orthogonal
+  to it.
 
-  :notes: 
-      - The nematic order parameter is computed using the `freud.order.Nematic` class from the freud 
-        library, which uses the orientation of the particles relative to the provided director.
-      - This function assumes that the director is a vector that represents the axis of preferred alignment. 
-        It is commonly used in systems such as liquid crystals or systems of elongated particles.
-      - A positive nematic order indicates a preference for alignment along the director, while a negative 
-        value would indicate an opposite alignment.
-
-  :examples: 
-      >>> orientations = np.random.rand(100, 3)  # 100 random particle orientations in 3D
-      >>> director = [0, 0, 1]  # Director along the z-axis
-      >>> nematic_order = calculate_nematic_order(orientations, director)
-      >>> print(nematic_order)  # Nematic order parameter of the system
+  Examples
+  --------
+  >>> orientations = np.random.rand(100, 3)
+  >>> director = [0, 0, 1]
+  >>> calculate_nematic_order(orientations, director)
   """
-  
+
   if not isinstance(director, np.ndarray):
       director = np.array(director)
   nematic = freud.order.Nematic(director)
   nematic.compute(orientations)
   return nematic.order
 
-def calculate_ql(boxDims, positions, L=6, voronoi = True, average = False, weighted = False):
+def calculate_ql(boxDims, positions, L=6, voronoi=True, average=False, weighted=False):
     """
-    .. function:: calculate_ql(boxDims, positions, L=6, voronoi=True, average=False, weighted=False)
+    Compute the Steinhardt order parameter ``q_l`` for a system of particles.
 
-      Calculate the Steinhardt order parameter :math:`q_l` for a given set of particles in a simulation box.
+    Parameters
+    ----------
+    boxDims : array_like of shape (3,)
+        Dimensions of the simulation box along x, y, and z.
+    positions : ndarray of shape (N, 3)
+        Particle coordinates. ``N`` is the number of particles.
+    L : int, optional
+        Spherical harmonic order ``l`` used in the Steinhardt definition.
+        Default is 6.
+    voronoi : bool, optional
+        If True, use a Voronoi-based neighborhood. In this mode,
+        ``average`` is ignored and ``weighted`` is forced to True.
+        Default is True.
+    average : bool, optional
+        Include second-shell contributions (Steinhardt ``\bar{q}_l`` variant).
+        Only applied when ``voronoi`` is False. Default is False.
+    weighted : bool, optional
+        Weight contributions by neighbor distances. Only applied when
+        ``voronoi`` is False. Default is False.
 
-      :param boxDims: Dimensions of the simulation box. A list or NumPy array of floats with length 3, where each entry defines the size of the box along the x, y, and z axes.
-      :type boxDims: list[float] or numpy.ndarray
-      :param positions: Positions of the particle centers in the simulation box. A NumPy array of shape :math:`(N, 3)` where :math:`N` is the number of particles.
-      :type positions: numpy.ndarray
-      :param L: The order of the Steinhardt spherical harmonics to compute. Default is 6.
-      :type L: int, optional
-      :param voronoi: Whether to use the Voronoi neighborhood to define neighbor lists. If True, `average` and `weighted` are automatically set to False and True, respectively. Default is True.
-      :type voronoi: bool, optional
-      :param average: Whether to include contributions from the second neighbor shell in the calculation. Only applicable when `voronoi` is False. Default is False.
-      :type average: bool, optional
-      :param weighted: Whether to weight the order parameter calculation by the distance from each particle. Only applicable when `voronoi` is False. Default is False.
-      :type weighted: bool, optional
-      :returns: The Steinhardt order parameter :math:`q_l` for each particle.
-      :rtype: numpy.ndarray
+    Returns
+    -------
+    ndarray of shape (N,)
+        The Steinhardt order parameter ``q_l`` for each particle.
 
-      .. note::
-        - If `voronoi` is True:
-          - The Voronoi neighborhood is used to define the neighbor list.
-          - `average` is ignored, and `weighted` is set to True.
-        - If `voronoi` is False:
-          - The neighbor list is defined based on distance-based metrics using the `L` parameter.
-          - The behavior of `average` and `weighted` depends on their respective input values.
+    Notes
+    -----
+    When ``voronoi`` is True, neighbor lists are constructed from
+    Voronoi tessellation. ``weighted`` is implicitly set to True and
+    ``average`` is unused. When ``voronoi`` is False, neighbor lists are
+    distance-based and the behaviors of ``average`` and ``weighted`` follow
+    their explicit input values.
 
-      **Examples**
+    Examples
+    --------
+    Compute ``q_l`` using Voronoi neighborhoods:
 
-      Compute the order parameter with Voronoi neighbors:
+    >>> boxDims = [10.0, 10.0, 10.0]
+    >>> positions = np.random.rand(100, 3) * 10.0
+    >>> calculate_ql(boxDims, positions, L=6, voronoi=True)
 
-      .. code-block:: python
+    Compute ``q_l`` using distance-based neighbors:
 
-        import numpy as np
-        boxDims = [10.0, 10.0, 10.0]
-        positions = np.random.rand(100, 3) * 10.0
-        calculate_ql(boxDims, positions, L=6, voronoi=True)
-
-      Compute the order parameter with distance-based neighbors:
-
-      .. code-block:: python
-
-        calculate_ql(boxDims, positions, L=6, voronoi=False, average=True, weighted=False)
-
-    """  
+    >>> calculate_ql(boxDims, positions, L=6,
+    ...              voronoi=False, average=True, weighted=False)
+    """
 
     if not isinstance(boxDims, np.ndarray):
         boxDims = np.array(boxDims)
@@ -119,42 +114,37 @@ def calculate_ql(boxDims, positions, L=6, voronoi = True, average = False, weigh
 
 def calculate_wl(boxDims, positions, L=6, normalize=False):
     """
-    Calculate the Steinhardt order parameter :math:`w_l` for each particle in a simulation box.
+    Compute the Steinhardt ``w_l`` order parameter for a system of particles.
 
-    This function computes the :math:`w_l` parameter, a variation of the Steinhardt order parameter 
-    that incorporates Wigner 3j symbols for describing the local symmetry of particle arrangements. 
-    The calculation can optionally include normalization.
+    Parameters
+    ----------
+    boxDims : array_like of shape (3,)
+        Dimensions of the simulation box along x, y, and z.
+    positions : ndarray of shape (N, 3)
+        Particle coordinates. ``N`` is the number of particles.
+    L : int, optional
+        Spherical harmonic order used in the ``w_l`` definition. Also
+        determines the neighbor count for the computation. Default is 6.
+    normalize : bool, optional
+        If True, normalize the ``w_l`` values. Default is False.
 
-    :param boxDims: Dimensions of the simulation box. A list or NumPy array of floats with length 3, 
-                    where each value represents the size of the box along the x, y, and z axes.
-    :type boxDims: list[float] or numpy.ndarray
-    :param positions: Positions of the particle centers in the simulation box. A NumPy array of shape 
-                      :math:`(N, 3)` where :math:`N` is the number of particles.
-    :type positions: numpy.ndarray
-    :param L: The order of the Steinhardt spherical harmonics to compute. This defines the number of 
-              neighbors to consider in the computation. Default is 6.
-    :type L: int, optional
-    :param normalize: Whether to normalize the :math:`w_l` values. If True, the order parameter values 
-                      are normalized. Default is False.
-    :type normalize: bool, optional
+    Returns
+    -------
+    ndarray of shape (N,)
+        The Steinhardt ``w_l`` order parameter for each particle.
 
-    :returns: A 1D NumPy array of size :math:`N`, where each element represents the :math:`w_l` parameter 
-              for the corresponding particle.
-    :rtype: numpy.ndarray
+    Notes
+    -----
+    ``w_l`` differs from the corresponding ``q_l`` parameter in that it
+    incorporates Wigner 3j symbols, providing a distinct measure of local
+    symmetry. Neighbor identification is based on the number of neighbors
+    implied by the chosen ``L`` value.
 
-    :note:
-        - The :math:`w_l` parameter differs from :math:`q_l` as it uses Wigner 3j symbols, providing a 
-          different characterization of local particle symmetry.
-        - The neighbors used in the calculation are determined based on the number of neighbors specified 
-          by the :math:`L` parameter.
-
-    :example:
-        >>> import numpy as np
-        >>> boxDims = [10.0, 10.0, 10.0]  # Box dimensions
-        >>> positions = np.random.rand(100, 3) * 10.0  # Random positions for 100 particles
-        >>> L = 6  # Number of neighbors to use
-        >>> wl_values = calculate_wl(boxDims, positions, L=L, normalize=True)
-        >>> print(wl_values)  # Output the w_l values for each particle
+    Examples
+    --------
+    >>> boxDims = [10.0, 10.0, 10.0]
+    >>> positions = np.random.rand(100, 3) * 10.0
+    >>> calculate_wl(boxDims, positions, L=6, normalize=True)
     """
 
     if not isinstance(boxDims, np.ndarray):
@@ -166,6 +156,45 @@ def calculate_wl(boxDims, positions, L=6, normalize=False):
     return wl_sc
 
 def calculate_smectic_order(particle_positions, nematic_director, layer_thickness_range):
+    """
+    Compute the smectic order parameter and optimal layer spacing for a system of particles.
+
+    Parameters
+    ----------
+    particle_positions : ndarray of shape (N, 3)
+        Positions of the particles. ``N`` is the number of particles.
+    nematic_director : array_like of shape (3,)
+        Nematic director used to project particle positions onto the layer-normal direction.
+        The vector is normalized internally.
+    layer_thickness_range : tuple or list
+        Search interval for the candidate smectic layer thickness used in the brute-force
+        optimization.
+
+    Returns
+    -------
+    smectic_order : float
+        Smectic order parameter evaluated at the optimal layer spacing. Values approach 1
+        for strong layering and 0 for no layering.
+    optimal_layer_thickness : float
+        Value of the layer spacing ``d`` that maximizes the smectic ordering measure.
+
+    Notes
+    -----
+    The smectic order parameter is computed by maximizing
+
+        S(d) = | Σ exp( i * 2π * (director · r) / d ) | / N
+
+    via a two-stage procedure:
+    a brute-force search over ``layer_thickness_range`` followed by refinement with
+    ``fmin`` (Nelder–Mead). The director is normalized before use.
+
+    Examples
+    --------
+    >>> positions = np.random.rand(500, 3)
+    >>> director = np.array([0, 0, 1])
+    >>> calculate_smectic_order(positions, director, (1.0, 10.0))
+    """
+  
     def calc_smectic(d, director, pos):
         return -(
             np.absolute(np.sum(np.exp(np.dot(director, pos.T) * 2 * np.pi * 1j / d)))

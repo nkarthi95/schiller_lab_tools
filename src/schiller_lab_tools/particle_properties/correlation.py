@@ -3,46 +3,41 @@ from frued.density import RDF
 
 def calculate_rdf(boxDims, positions):
     """
-    Calculate the radial distribution function (RDF) for a system of particles.
+    Compute the radial distribution function (RDF) for a particle system.
 
-    This function computes the radial distribution function (g(r)) for a system of particles, 
-    using the freud library's RDF implementation. The RDF is calculated by determining the 
-    density of particles as a function of distance from a reference particle. The function 
-    returns the radii `r_s` and the normalized densities `g_r` for the system.
+    Parameters
+    ----------
+    boxDims : ndarray of shape (D,)
+        Simulation box dimensions along each axis.
+    positions : ndarray of shape (N, D)
+        Particle coordinates. ``N`` is the number of particles and ``D`` is
+        the spatial dimension.
 
-    :param boxDims: 
-        A 1D numpy array of length D representing the dimensions of the simulation box. The values 
-        in the array correspond to the size of the box along each dimension (e.g., [Lx, Ly, Lz] for a 
-        3D system).
-    :type boxDims: numpy.ndarray
-    :param positions: 
-        A 2D numpy array of shape (N, D) representing the positions of the particles in the system, 
-        where N is the number of particles and D is the number of dimensions (e.g., 3 for a 3D system).
-    :type positions: numpy.ndarray
+    Returns
+    -------
+    r_s : ndarray
+        Radii (bin edges) used in the RDF calculation.
+    g_r : ndarray
+        Normalized radial distribution function evaluated at the radii.
+        ``g_r = 1`` corresponds to an ideal gas.
 
-    :return: 
-        A tuple containing:
-        - `r_s`: A 1D numpy array of the radii (bin edges) used in the RDF calculation. These represent 
-        the radial distances from a reference particle.
-        - `g_r`: A 1D numpy array of the normalized radial distribution function, which represents the 
-        density of particles as a function of distance from a reference particle.
-    :return type: tuple (numpy.ndarray, numpy.ndarray)
+    Notes
+    -----
+    The maximum radius is computed as
+    ``r_max = ceil(min(boxDims) * sqrt(3) / 4)``, used to define the RDF
+    cutoff. The computation uses ``freud.density.RDF`` to evaluate pair
+    statistics and return normalized densities. ``r_s`` corresponds to the
+    bin edges and ``g_r`` to the RDF values for each bin.
 
-    :notes: 
-        - The `r_max` parameter is calculated as the ceiling of `np.min(boxDims) * np.sqrt(3) / 4`, 
-        which provides an estimate for the maximum radial distance used in the RDF calculation.
-        - The function uses the `freud.density.RDF` class from the freud library to perform the RDF computation.
-        - The radial distribution function is normalized such that `g_r = 1` for an ideal gas.
-        - The output `r_s` represents the bin edges, and `g_r` represents the density at each corresponding 
-        radial distance.
-
-    :examples: 
-        >>> boxDims = np.array([10.0, 10.0, 10.0])  # Simulation box dimensions in 3D
-        >>> positions = np.random.rand(1000, 3) * boxDims  # Random particle positions in 3D
-        >>> r_s, g_r = calculate_rdf(boxDims, positions)
-        >>> print(r_s)  # Radii used in the RDF calculation
-        >>> print(g_r)  # Normalized radial distribution function values
+    Examples
+    --------
+    >>> boxDims = np.array([10.0, 10.0, 10.0])
+    >>> positions = np.random.rand(1000, 3) * boxDims
+    >>> r_s, g_r = calculate_rdf(boxDims, positions)
+    >>> r_s[:5]
+    >>> g_r[:5]
     """
+
 
     L = np.amin(boxDims)
     r_max = int(np.ceil(np.min(boxDims) * np.sqrt(3) / 4))
