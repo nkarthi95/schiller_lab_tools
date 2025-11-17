@@ -1,11 +1,15 @@
 import numpy as np
 from numba import njit
-from pyvista import PolyData, ImageData
+from pyvista import ImageData
 from skimage.measure import marching_cubes, label
 from skimage.transform import downscale_local_mean
 from _csd_helper_calculation import calculate_genus_handles_surface_area
 from _csd_helper_smoothing import boxcar_avg
-from scipy.ndimage import convolve
+from scipy.ndimage import distance_transform_edt
+
+# -----------------------------------------------------------
+# Helpers: Binarizing a bolume field
+# -----------------------------------------------------------
 
 def label_regions_hk(phi, filter=None):
     """
@@ -64,6 +68,179 @@ def label_regions_hk(phi, filter=None):
     
     phi_label = np.where(phi_label == l, 1, 0)
     return phi_label
+
+# -----------------------------------------------------------
+# Helpers: Distance transforms
+# -----------------------------------------------------------
+
+@njit
+def _gradient_upwind_3d(phi, indicator, dx):
+    nx, ny, nz = phi.shape
+    grad = np.empty((nx, ny, nz))
+
+    for i in range(nx):
+        for j in range(ny):
+            for k in range(nz):
+                x = i%nx
+                y = j%ny
+                z = k%nz
+
+                # Forward/backward differences in x
+                x_forward = (i+1)%nx
+                x_backward = (i-1)%nx
+                phi_x_forward = (phi[x_forward,y,z] - phi[x,y,z])/dx
+                phi_x_backward = (phi[x,y,z] - phi[x_backward,y,z])/dx
+                phi_x_p = np.maximum(phi_x_backward, 0)**2 + np.minimum(phi_x_forward, 0)**2
+                phi_x_m = np.minimum(phi_x_backward, 0)**2 + np.maximum(phi_x_forward, 0)**2
+
+                # Forward/backward differences in y
+                y_forward = (j+1)%ny
+                y_backward = (j-1)%ny
+                phi_y_forward = (phi[x, y_forward,z] - phi[x,y,z])/dx
+                phi_y_backward = (phi[x,y,z] - phi[x, y_backward,z])/dx
+                phi_y_p = np.maximum(phi_y_backward, 0)**2 + np.minimum(phi_y_forward, 0)**2
+                phi_y_m = np.minimum(phi_y_backward, 0)**2 + np.maximum(phi_y_forward, 0)**2
+
+                # Forward/backward differences in z
+                z_forward = (k+1)%nz
+                z_backward = (k-1)%nz
+                phi_z_forward = (phi[x,y,z_forward] - phi[x,y,z])/dx
+                phi_z_backward = (phi[x,y,z] - phi[x,y,z_backward])/dx
+                phi_z_p = np.maximum(phi_z_backward, 0)**2 + np.minimum(phi_z_forward, 0)**2
+                phi_z_m = np.minimum(phi_z_backward, 0)**2 + np.maximum(phi_z_forward, 0)**2
+
+                # Magnitude of gradient
+                if indicator[x,y,z] >= 0:
+                    grad[x,y,z] = np.sqrt(phi_x_p + phi_y_p + phi_z_p)
+                else:
+                    grad[x,y,z] = np.sqrt(phi_x_m + phi_y_m + phi_z_m)
+    
+    return grad
+
+def reinitialize_3d(phi0, dx=1.0, dt=0.1, iterations=1000, max_error = 1e-8, epsilon = 1e-6):
+    phi = phi0.copy()
+    sign_phi0 = phi0/np.sqrt(phi0**2 + epsilon**2)
+    errors = []
+    
+    curr_ite = 0
+    curr_err = 1
+
+    while curr_ite <= iterations:
+        grad = _gradient_upwind_3d(phi, sign_phi0, dx)
+        phi_new = phi - dt*sign_phi0*(grad - 1)
+
+        curr_err = np.mean(np.abs(phi_new - phi))
+        errors.append(curr_err)
+        phi = phi_new
+        
+        if curr_err < max_error:
+            break
+
+        curr_ite += 1
+    
+    return phi, errors
+
+def create_euclidean_distance_transform(phi):
+    """
+    Computes the Euclidean distance transform of a 3D emulsion surface.
+
+    The function calculates the signed Euclidean distance of each point in the 
+    input array `phi` to the interface between phases. Positive distances 
+    correspond to points in the phase where `phi >= 0`, while negative distances 
+    correspond to points where `phi <= 0`.
+
+    Parameters
+    ----------
+    phi : numpy.ndarray
+        A 3D NumPy array representing the emulsion surface.
+
+    Returns
+    -------
+    numpy.ndarray
+        A 3D NumPy array of the same shape as `phi`, where each element contains 
+        the Euclidean distance to the nearest interface. Positive values indicate 
+        distances inside the `phi >= 0` region, and negative values indicate 
+        distances inside the `phi <= 0` region.
+
+    Notes
+    -----
+    - The function uses `distance_transform_edt` from `scipy.ndimage` to compute 
+      the Euclidean distance transform.
+    - The interface is determined by binarizing the input array into two regions:
+      one where `phi >= 0` and another where `phi <= 0`.
+    - Signed distances are assigned accordingly, with positive distances inside 
+      the `phi >= 0` region and negative distances inside the `phi <= 0` region.
+    """
+    phi_edt = np.empty(phi.shape)
+
+    # phi_bin_pos = label_regions_hk(phi, lambda x: np.where(x >= 0, 1, 0))
+    # phi_bin_neg = label_regions_hk(phi, lambda x: np.where(x <= 0, 1, 0))
+    phi_bin_pos = np.where(phi >= 0, 1, 0)
+    phi_bin_neg = np.where(phi < 0, 1, 0)
+
+    phi_edt_pos = distance_transform_edt(phi_bin_pos)
+    phi_edt_neg = distance_transform_edt(phi_bin_neg)
+
+    idxs = np.where(phi >= 0)
+    phi_edt[idxs] = phi_edt_pos[idxs]
+    idxs = np.where(phi < 0)
+    phi_edt[idxs] = -phi_edt_neg[idxs]
+
+    return phi_edt
+
+# -------------------------------------------------------------
+# Helpers: Volumetric data based interface smoothing algorithms
+# -------------------------------------------------------------
+
+@njit
+def boxcar_avg(data, l = 1):
+    """
+    Performs a boxcar averaging on a 3D NumPy array.
+
+    The function computes the average value of neighboring cells within a given 
+    window size `l` for each element in the input array. It handles three cases:
+    interior portions, edges, and corners, using the modulo operator for periodic 
+    boundary conditions.
+
+    Parameters
+    ----------
+    data : numpy.ndarray
+        A 3D NumPy array representing the input data to be averaged.
+    l : int, optional
+        The number of cells to average over in each direction (default is 1).
+
+    Returns
+    -------
+    numpy.ndarray
+        A 3D NumPy array with the averaged values.
+
+    Notes
+    -----
+    - The function uses periodic boundary conditions to handle edges and corners.
+    - The function does not modify the input array.
+    - It utilizes a simple brute-force approach for averaging.
+    """
+    nx, ny, nz = data.shape
+    smoothed = np.empty(data.shape)
+    for i in range(0, nx):
+        for j in range(0, ny):
+            for k in range(0, nz):      
+                sum_data = 0.0
+
+                sum_data += data[i,j,k]
+                # nearest neighbor x
+                sum_data += data[(i-1)%nx, j, k]
+                sum_data += data[(i+1)%nx, j, k]
+                # nearest neighbor y
+                sum_data += data[i, (j-1)%ny, k]
+                sum_data += data[i, (j+1)%ny, k]
+                # nearest neighbor z
+                sum_data += data[i, j, (k-1)%nz]
+                sum_data += data[i, j, (k+1)%nz]
+                
+                smoothed[i, j, k] = sum_data/7
+    
+    return smoothed
 
 @njit()
 def fill(field):
@@ -139,6 +316,10 @@ def fill(field):
 
     return field
 
+# -------------------------------------------------------------
+# Helpers: Order parameter of interface
+# -------------------------------------------------------------
+
 def interface_order(phi):
     """
     Compute the maximum eigenvalue of the orientation tensor for the system.
@@ -178,61 +359,9 @@ def interface_order(phi):
     ev, evec = np.linalg.eig(Q)
     return max(ev)
 
-def curvature(phi, limit=(50, 1), step_size = 1):
-    """
-    Compute the Gaussian and mean curvatures, as well as the interface area, for a given order parameter.
-
-    This function uses a marching cubes algorithm to extract an isosurface mesh from the input order parameter 
-    `phi`. It then calculates the Gaussian and mean curvatures of the mesh and filters them based on specified 
-    limits. The function returns the filtered curvatures and the total area of the interface.
-
-    :param phi:
-        A 2D or 3D array representing the order parameter of the system, typically used to describe a density 
-        field or phase. The function generates a mesh of the isosurface of `phi` using a marching cubes algorithm.
-    :type phi: numpy.ndarray
-
-    :param limit:
-        A tuple `(K_max, H_max)` where `K_max` and `H_max` specify the maximum absolute values for filtering the 
-        Gaussian and mean curvatures, respectively. Only curvatures with absolute values less than these limits 
-        will be returned. Default is `(50, 1)`.
-    :type limit: tuple of float, optional
-
-    :param step_size:
-        An integer that specifies how coarse the squares to calculate the marching squared grid is.
-    :type step_size: integer, optional
-
-    :return:
-        A tuple containing:
-        - **K** (*numpy.ndarray*): The Gaussian curvature at each vertex of the isosurface, filtered based on the specified limit.
-        - **H** (*numpy.ndarray*): The mean curvature at each vertex of the isosurface, filtered based on the specified limit.
-        - **A** (*float*): The total area of the interface of the isosurface.
-    :rtype: tuple
-
-    :note:
-        - The marching cubes algorithm is used to extract an isosurface from the input `phi` field, and the curvatures 
-          are computed on the resulting mesh.
-        - The curvatures are filtered by comparing their absolute values to the provided `limit`. 
-        - The area of the interface is computed using the `pv.PolyData.area` method from the `pyvista` library.
-
-    :example:
-        >>> import numpy as np
-        >>> phi = np.random.random((10, 10, 10))
-        >>> K, H, A = curvature(phi, limit=(30, 0.5))
-        >>> print(K.shape, H.shape, A)
-    """
-    # Use marching cubes to obtain isosurface mesh
-    verts, faces, normals, values = marching_cubes(phi, 0, step_size = step_size)
-    pmesh = PolyData(verts, np.insert(faces, 0, 3, axis=1))
-    
-    K = pmesh.curvature(curv_type="gaussian")
-    H = pmesh.curvature(curv_type="mean")
-    A = pmesh.area
-    
-    # Apply filtering based on the curvature limits
-    filt_K = np.abs(K) < limit[0]
-    filt_H = np.abs(H) < limit[1]
-
-    return K[filt_K], H[filt_H], A
+# -------------------------------------------------------------
+# Helpers: Meshing the interface at a level
+# -------------------------------------------------------------
 
 def get_mesh(analyte, boxDims, level = 0, 
              origin = (0,0,0), spacing = (1,1,1), 
@@ -250,83 +379,9 @@ def get_mesh(analyte, boxDims, level = 0,
     mesh = grid.contour([level], test.flatten(order = order), method=method)
     return mesh
 
-def calc_csd(phi_edt, l = 1, nbins = None, method = "region_props", decimate_prop = 0.7):
-    """
-    Computes the channel size distribution (CSD) in a binary fluid system.
-
-    This function calculates the CSD by determining the genus and number of handles 
-    of the structure across different normalized radii, following the method described 
-    in the paper: https://doi.org/10.1016/j.actamat.2011.12.042.
-
-    Parameters
-    ----------
-    phi_edt : numpy.ndarray
-        A 3D NumPy array representing the distance transform of an order parameter of a binary fluid system.
-    l : int, optional
-        The number of grid points to average over when computing the distance transform. (Default is 3)
-    nbins : int, optional
-        Number of bins used to calculate topology of distance from the interface (default is None which sets bin width to 1).
-    step_size : int, optional
-        The step size used in the marching cubes algorithm to extract surface information (default is 4).
-    method: str, optional
-        Specifies which method to use for the genus calculation algorithm. Options are 'region_props'(default) and 'mesh'.
-    Returns
-    -------
-    tuple
-        A tuple containing:
-        - **radii_norm (numpy.ndarray)**: Normalized radii values ranging from 0 to 1.
-        - **gv (numpy.ndarray)**: Genus density values as a function of the normalized radii.
-        - **hv (numpy.ndarray)**: Handle density values as a function of the normalized radii.
-        - **voids (numpy.ndarray)**: Number of voids in the system as a function of the normalized radii.
-
-    Notes
-    -----
-    - The genus (g) and number of handles (h) are calculated at different radii using 
-      `calculate_genus_handles_surface_area()`, with normalized distances.
-    - A boxcar averaging filter is applied based on a convolution.
-    - The genus and handle densities are normalized by the system volume and surface area density.
-    - The final values are computed symmetrically for positive values only. Structure is assumed to be symmetric.
-    """
-
-    if l is not None:
-        if l == 1:
-            edt_in = boxcar_avg(phi_edt, l = 1)
-        else:
-            kernel = np.ones((2*l + 1, 2*l + 1, 2*l + 1))
-            edt_in = convolve(phi_edt, kernel, mode = "wrap")/np.prod(kernel.shape)
-    else:
-        edt_in = phi_edt
-
-    V = np.prod(edt_in.shape)
-    _, _, _, A = calculate_genus_handles_surface_area(edt_in, level = 0, method = "region_props")
-    # print(A)
-    sigma = A/V
-    factor = V*np.power(sigma, 3)
-
-    # lmax = 1/(sigma)
-    # print(lmax)
-    lmax = np.amin(edt_in.shape)//2
-    if nbins is None:
-        distance = np.arange(0, np.ceil(lmax), 1, dtype = float)
-    else:
-        distance = np.linspace(0, lmax, nbins, dtype = float)
-
-    gv = np.zeros_like(distance)
-    hv = np.zeros_like(distance)
-    voids = np.zeros_like(distance)
-
-    for i, c in enumerate(distance):
-        if c <= edt_in.max():
-            # print(c)
-            g, h, v, A =calculate_genus_handles_surface_area(edt_in, c, method = method, decimate_prop=decimate_prop)
-            # if g > 0:
-            gv[i] += g#/factor
-            hv[i] += h#/factor
-            voids[i] = v
-        else:
-            continue
-
-    return distance, gv, hv, voids
+# ---------------------------------------------------------------------
+# Helpers: Calculating the angle of a set of particles to the interface
+# ---------------------------------------------------------------------
 
 def calculate_average_cos_interface_normal(phi, positions, orientations, step_size=1, cutoff=7.9):
     """
