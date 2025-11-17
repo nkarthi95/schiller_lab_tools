@@ -46,11 +46,29 @@ def fibonacci_sphere(N, R, center=(0, 0, 0), jitter=0.0):
 
     return coords
 
-def quaternion_from_orientation(v_from, v_to):
+def orientation_to_quarternion(v_from, v_to):
     """
-    Construct a quaternion that rotates v_from to v_to.
-    Both vectors must be normalized.
+    Construct a quaternion that rotates one normalized vector into another.
+
+    Parameters
+    ----------
+    v_from : ndarray of shape (3,)
+        Source direction vector.
+    v_to : ndarray of shape (3,)
+        Target direction vector.
+
+    Returns
+    -------
+    ndarray of shape (4,)
+        Quaternion ``[w, x, y, z]`` representing the rotation that maps
+        ``v_from`` onto ``v_to``.
+
+    Notes
+    -----
+    The quaternion returned represents the minimal rotation that aligns the two directions.
+
     """
+
     v_from = v_from / np.linalg.norm(v_from)
     v_to = v_to / np.linalg.norm(v_to)
 
