@@ -1,6 +1,6 @@
 import numpy as np
 
-def fibonacci_sphere(N, R):
+def fibonacci_sphere(N, R, center=(0, 0, 0), jitter=0.0):
     """
     Generate approximately uniform point samples on a sphere using
     the Fibonacci (golden-angle) method.
@@ -12,6 +12,11 @@ def fibonacci_sphere(N, R):
     R : array_like or float
         Radius scaling applied to each coordinate. If array-like of shape (3,),
         scaling is anisotropic along each axis; if scalar, scaling is isotropic.
+    center : array_like
+             Defines the location of the sphere's center of mass
+    jitter : float
+             Defines the standard deviation of a normal distribution used to slightly
+             shift the particles from the specified radius
 
     Returns
     -------
@@ -26,17 +31,44 @@ def fibonacci_sphere(N, R):
     and assigns ``z = y`` exactly as defined in this function before scaling.
     Centering is not performed; shift by adding a center vector externally.
     """
-    # shift to center if needed by adding a center vector afterward
-    i = np.arange(N)
-    phi = np.pi * (3. - np.sqrt(5.))         # golden angle
-    y = 1 - (2*i + 1)/N                      # y = cos(theta)
-    r = np.sqrt(1 - y*y)
-    theta = i * phi
 
-    x = r * np.cos(theta)
-    y = r * np.sin(theta)
-    z = y
-
+    offset = 2.0/N
+    increment = np.pi*(3.0 - np.sqrt(5))  # Golden angle
+    y = ((np.arange(N)*offset) - 1) + offset/2
+    r = np.sqrt(1 - y * y)
+    phi = np.arange(N)*increment
+    x = np.cos(phi)*r
+    z = np.sin(phi)*r
     coords = np.column_stack((x,y,z))
+    coords += np.random.normal(loc = 0, scale = jitter)
+    coords = np.multiply(coords, R)
+    coords += np.array(center)[np.newaxis, :]
 
-    return np.multiply(coords, R)
+    return coords
+
+def quaternion_from_orientation(v_from, v_to):
+    """
+    Construct a quaternion that rotates v_from to v_to.
+    Both vectors must be normalized.
+    """
+    v_from = v_from / np.linalg.norm(v_from)
+    v_to = v_to / np.linalg.norm(v_to)
+
+    dot = np.dot(v_from, v_to)
+    out = np.empty(4)
+    if dot > 0.999999:
+        # Vectors are almost identical
+        out = np.array([1.0, 0.0, 0.0, 0.0])  # Identity quaternion
+    elif dot < -0.999999:
+        # Vectors are opposite; rotate 180° around orthogonal axis
+        axis = np.cross(v_from, [1.0, 0.0, 0.0])
+        if np.linalg.norm(axis) < 1e-6:
+            axis = np.cross(v_from, [0.0, 1.0, 0.0])
+        axis = axis / np.linalg.norm(axis)
+        out = np.array([0.0, *axis])  # 180° rotation quaternion
+    else:
+        axis = np.cross(v_from, v_to)
+        s = np.sqrt((1.0 + dot) * 2.0)
+        invs = 1.0 / s
+        out = np.array([s*0.5, axis[0]*invs, axis[1]*invs, axis[2]*invs])
+    return out
