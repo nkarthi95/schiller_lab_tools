@@ -2,7 +2,7 @@ import numpy as np
 from numba import njit
 from skimage.measure import label, euler_number
 from skimage.measure import label, euler_number, marching_cubes, mesh_surface_area
-from interface import get_mesh, boxcar_avg
+from .interface import get_mesh, boxcar_avg
 from scipy.ndimage import convolve
 from pyvista import PolyData
 

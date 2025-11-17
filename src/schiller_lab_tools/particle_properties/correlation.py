@@ -1,5 +1,5 @@
 import numpy as np
-from frued.density import RDF
+from freud.density import RDF
 
 def calculate_rdf(boxDims, positions):
     """

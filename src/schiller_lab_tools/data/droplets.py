@@ -1,7 +1,7 @@
 from skimage.draw import ellipsoid
 import numpy as np
 from scipy.ndimage import center_of_mass
-from particles import fibonacci_sphere
+from .particles import fibonacci_sphere
 
 def draw_ellipsoid_in_box(ellipseDims, boxDims, npart = 0, seedval = None):
     """

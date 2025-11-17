@@ -3,8 +3,6 @@ from numba import njit
 from pyvista import ImageData
 from skimage.measure import marching_cubes, label
 from skimage.transform import downscale_local_mean
-from _csd_helper_calculation import calculate_genus_handles_surface_area
-from _csd_helper_smoothing import boxcar_avg
 from scipy.ndimage import distance_transform_edt
 
 # -----------------------------------------------------------
