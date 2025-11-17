@@ -20,3 +20,4 @@ documentation for details.
    api/visualization
    api/data
    api/particle_properties
+   api/lb3d

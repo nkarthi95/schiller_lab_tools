@@ -2,6 +2,43 @@ import xdrlib
 import numpy as np
 
 def write_checkparams_xdr(filename, params):
+    """
+    Write simulation parameters to an XDR-encoded binary file.
+
+    Parameters
+    ----------
+    filename : str
+        Path to the output file that will receive the XDR-encoded data. Includes the .xdr
+        format in the filename
+    params : dict
+        Dictionary containing all required simulation parameters.  
+        The function expects the keys listed in ``double_fields`` and
+        ``int_fields``. Values corresponding to ``double_fields`` must be
+        float-convertible; values corresponding to ``int_fields`` must be
+        int-convertible.
+
+    Returns
+    -------
+    None
+        The function writes data to disk and returns nothing.
+
+    Notes
+    -----
+    The function serializes parameters using ``xdrlib.Packer`` in the
+    following order:
+
+    * 42 double-precision values, packed in the order specified by
+      ``double_fields``.
+    * 29 integer values, packed in the order specified by ``int_fields``.
+
+    This ordering is strict and must match the expected structure of any
+    downstream code reading the resulting XDR file. Missing keys or
+    type-mismatched entries in ``params`` will produce errors during packing.
+
+    The encoded buffer is written verbatim to ``filename`` in binary mode.
+
+    """
+
     packer = xdrlib.Packer()
 
     # === Write 42 doubles ===
@@ -38,18 +75,33 @@ def write_checkparams_xdr(filename, params):
     with open(filename, "wb") as f:
         f.write(packer.get_buffer())
 
-def write_checkpoint_xdr(filename, domain, nx, ny, nz):
+def write_checkpoint_xdr(filename, domain):
     """
-    Write a checkpoint*.xdr file for the fluid domain (Fortran-compatible layout).
-    
-    Args:
-        filename (str): Output file path.
-        domain (3D list of dict): domain[x][y][z], each with:
-            - 'n_r': list of floats
-            - optionally: 'n_b': list of floats (if not SINGLEFLUID)
-            - 'rock_state', 'rock_colour', 'rock_colour_r', 'rock_colour_b'
-        cdims (list of 3 ints): Optional domain decomposition dimensions.
-        shear_sum (float): Optional shear_sum value.
+    Write a fluid-domain checkpoint file in XDR format using Fortran-compatible layout.
+
+    Parameters
+    ----------
+    filename : str
+        Path to the output XDR checkpoint file. Includes .xdr in format specifier.
+    domain : [nx,ny,nz,indices] shaped ndarray
+             Index 0-18 contains red fluid
+             Index 19-38 contains blue fluid
+             Index 39,40 contain rock state
+
+    Returns
+    -------
+    None
+        Writes binary XDR data to disk and returns nothing.
+
+    Notes
+    -----
+    Fluid and rock fields are serialized for each lattice site in
+    Fortran ordering (z-major, then y, then x).
+    ``n_r`` and ``n_b`` fields are written as doubles; rock fields as integers.
+    The structure must match the expectations of the LB3D Fortran reader.
+
+    The caller is responsible for ensuring consistent field definitions
+    within each element of ``domain[x][y][z]``.
     """
     packer = xdrlib.Packer()
 
@@ -66,14 +118,35 @@ def write_checkpoint_xdr(filename, domain, nx, ny, nz):
 
 def write_checktopo_xdr(filename, topo_dict):
     """
-    Write checktopo*.xdr file.
-    
-    Args:
-        filename (str): Output path.
-        cdims (list of int): 3-element list of domain decomposition dimensions.
-        all_ccoords (list of int): Flattened list of all rank coordinates (3 * nprocs).
-        shear_sum (float or None): Optional shear_sum value.
+    Write a topology checkpoint file (checktopo*.xdr) in XDR format.
+
+    Parameters
+    ----------
+    filename : str
+        Path to the output XDR file. Includes .xdr in the filename
+    topo_dict : dict
+        Dictionary containing topology metadata. Expected keys:
+            * ``"cdims"`` : array_like of shape (3,)
+              Domain decomposition dimensions.
+            * ``"all_ccoords"`` : array_like of shape (3 * nprocs,)
+              Flattened list of per-rank coordinates.
+            * ``"shear_sum"`` : float or None
+              Optional shear-sum value to encode.
+
+    Returns
+    -------
+    None
+        Writes XDR-encoded topology data to ``filename``.
+
+    Notes
+    -----
+    The function encodes the entries of ``topo_dict`` in the order expected
+    by the LB3D topology reader. All values are written using XDR integer
+    or double-precision encodings as appropriate. No consistency checks are
+    performed; the caller is responsible for supplying a valid structure.
+
     """
+
     packer = xdrlib.Packer()
 
     cdims = topo_dict['cdims']
@@ -105,29 +178,51 @@ def write_md_checkpoint_xdr(
     magdispersity=False,
     steps_per_lbe_step=1,
     include_rhof=False,
-    interaction=None,  # e.g., 'ladd'
-    ladd_props = None,
-    boundary=None,  # e.g., 'periodic_inflow'
+    interaction=None,
+    ladd_props=None,
+    boundary=None,
     first_inserted_puid=None,
     n_spec=None
 ):
     """
-    Write a Fortran-compatible md-checkpoint*.xdr file with full conditional support.
-    
-    Args:
-        filename (str): Output file name.
-        particles (list of dict): Particle list with required fields.
-        use_rotation (bool): Include rotation fields.
-        polydispersity (bool): Include R_orth, R_para.
-        magdispersity (bool): Include mag field.
-        steps_per_lbe_step (int): Controls velocity accumulator.
-        include_rhof (bool): Include rhof if LADD_SURR_RHOF is active.
-        interaction (str): 'ladd' or None.
-        global_mass_change (list): Only if interaction == 'ladd'.
-        global_mass_target (list): Only if interaction == 'ladd'.
-        boundary (str): 'periodic_inflow' or None.
-        first_inserted_puid (int): Required if boundary == 'periodic_inflow'.
-        n_spec (int): Number of species for ladd mass arrays.
+    Write a particle checkpoint file (md-checkpoint*.xdr) in
+    Fortran-compatible XDR format with full conditional field support.
+
+    Parameters
+    ----------
+    filename : str
+        Path to the output XDR file including the .xdr format.
+    particles : list of dict
+        Particle data records required by the MD configuration.
+    use_rotation : bool, optional
+        Include rotational quantities if True.
+    polydispersity : bool, optional
+        Include polydisperse radius fields if True.
+    magdispersity : bool, optional
+        Include magnetic-moment fields if True.
+    steps_per_lbe_step : int, optional
+        MD-to-LBE stepping ratio.
+    include_rhof : bool, optional
+        Include local-fluid density fields if True.
+    interaction : str or None, optional
+        If ``"ladd"``, LADD mass-exchange fields are expected.
+    ladd_props : dict or None, optional
+        LADD mass-exchange parameters.
+    boundary : str or None, optional
+        If ``"periodic_inflow"``, special metadata is included.
+    first_inserted_puid : int or None, optional
+        Required when ``boundary="periodic_inflow"``.
+    n_spec : int or None, optional
+        Number of LADD species.
+
+    Returns
+    -------
+    None
+        Writes XDR-encoded particle data.
+
+    Notes
+    -----
+    The encoded structure depends on the active configuration flags.
     """
     packer = xdrlib.Packer()
 
@@ -220,6 +315,32 @@ def write_md_checkpoint_xdr(
         f.write(packer.get_buffer())
 
 def read_checkparams_xdr(filename):
+    """
+    Read a checkparams*.xdr file and return all encoded simulation parameters.
+
+    Parameters
+    ----------
+    filename : str
+        Path to the XDR-encoded parameter file. .xdr included in filename
+
+    Returns
+    -------
+    dict
+        Dictionary containing all unpacked parameters.
+        Includes 42 double-precision fields and 29 integer fields.
+
+    Notes
+    -----
+    Values are decoded using xdrlib.Unpacker in fixed order.
+    ``unpacker.done()`` ensures no remaining bytes.
+
+    Examples
+    --------
+    >>> params = read_checkparams_xdr("checkparams.xdr")
+    >>> params["beta"]
+    0.1234
+    """
+
     with open(filename, "rb") as f:
         data = f.read()
 
@@ -258,19 +379,42 @@ def read_checkparams_xdr(filename):
 
 def read_checkpoint_xdr(filenames, nx, ny, nz, topology, Q=19):
     """
-    Read a Fortran-compatible checkpoint*.xdr file and return a numpy array of the checkpoint data and rock files.
-    Index 0:Q stores the mass distribution data for the red fluid
-    Index Q:2Q stores the mass distribution data for the blue fluid
-    Index 2Q: stores the data for the rock state
-    Supports multicore output files
-    
-    Args:
-        filename (str): Path to .xdr checkpoint file.
-        nx, ny, nz (int): Dimensions of the fluid subdomain (x, y, z).
-        topology (dict): Instructs the loop how to perform domain reconstruction
-    
-    Returns:
-        checkpoint_props: (nx, ny, nz, 2*Q + 4)
+    Read one or more Fortran-compatible checkpoint*.xdr files and reconstruct
+    the full fluid domain into a NumPy array.
+
+    Parameters
+    ----------
+    filenames : list of str or str
+        One or more XDR checkpoint files. Multiple files correspond to
+        domain-decomposed (multicore) output.
+    nx, ny, nz : int
+        Dimensions of the reconstructed global fluid domain along x, y, and z.
+    topology : dict
+        Topology information describing how subdomains map into the global
+        domain. Expected to contain decomposition metadata such as rank
+        coordinates or layout needed to assemble the full 3D array.
+    Q : int, optional
+        Number of lattice velocity directions in the LB model. Default is 19.
+
+    Returns
+    -------
+    ndarray of shape (nx, ny, nz, 2*Q + 4)
+        Fully reconstructed checkpoint array. Channels are organized as:
+            * indices 0 : Q       — red-fluid mass distributions
+            * indices Q : 2Q      — blue-fluid mass distributions
+            * indices 2Q         — rock-state field
+            * indices 2Q+1 ...   — additional rock metadata (e.g.,
+              rock colour and related fields)
+
+    Notes
+    -----
+    The function reads each XDR file using Fortran-compatible ordering and
+    merges all subdomain data according to the supplied ``topology`` mapping.
+    The LB distributions for red and blue fluids each occupy ``Q`` channels.
+    Rock-related fields follow after the fluid distributions. The caller must
+    ensure that ``topology`` is consistent with the domain decomposition used
+    when writing the checkpoint files.
+
     """
 
     topo_decomp = np.array(topology["cdims"])
@@ -300,6 +444,48 @@ def read_checkpoint_xdr(filenames, nx, ny, nz, topology, Q=19):
     return checkpoint_props
 
 def read_checktopo_xdr(filename, nprocs=None):
+    """
+    Read a checktopo*.xdr topology file and return the domain-decomposition metadata.
+
+    Parameters
+    ----------
+    filename : str
+        Path to the XDR-encoded topology file which includes the xdr file format
+    nprocs : int, optional
+        Number of MPI ranks (subdomains). If not provided, the value is
+        inferred from the remaining byte count in the file.
+
+    Returns
+    -------
+    dict
+        Dictionary containing:
+            * ``"cdims"`` : list of int  
+              Domain-decomposition dimensions along x, y, z (3 integers).
+            * ``"all_ccoords"`` : list of int  
+              Flattened list of rank coordinates of length ``3 * nprocs``.
+            * ``"nprocs"`` : int  
+              Number of ranks detected or provided.
+            * ``"shear_sum"`` : float or None  
+              Optional shear-sum value, present only if encoded in the file.
+
+    Notes
+    -----
+    If ``nprocs`` is not supplied, it is inferred from the number of
+    remaining bytes after the ``cdims`` block. Each rank contributes
+    12 bytes (three 4-byte integers), and an additional 8 bytes may be
+    present for a trailing ``shear_sum`` value.  
+    The function uses ``xdrlib.Unpacker`` to decode the file in strict
+    XDR order.
+
+    Examples
+    --------
+    >>> topo = read_checktopo_xdr("checktopo.xdr")
+    >>> topo["cdims"]
+    [2, 2, 1]
+    >>> topo["nprocs"]
+    4
+    """
+
     with open(filename, "rb") as f:
         data = f.read()
 
@@ -345,14 +531,55 @@ def read_md_checkpoint_xdr(
     boundary=None
 ):
     """
-    Read a Fortran-compatible md-checkpoint*.xdr file with full conditional support.
-    
-    Returns:
-        dict with keys:
-            - particles: list of particle dicts
-            - ladd_data: dict with keys pfr, pfb, pfg, global_mass_change, global_mass_target
-            - first_inserted_puid: int (if periodic_inflow)
+    Read an LB3D particle checkpoint file (md-checkpoint*.xdr) and decode all
+    particle and interaction data according to the active configuration flags.
+
+    Parameters
+    ----------
+    filename : str
+        Path to the XDR-encoded MD checkpoint file.
+    use_rotation : bool, optional
+        If True, decode rotational quantities (angular velocity, torque).
+    polydispersity : bool, optional
+        If True, decode per-particle radius fields (e.g., ``R_orth``, ``R_para``).
+    magdispersity : bool, optional
+        If True, decode magnetic-moment fields.
+    steps_per_lbe_step : int, optional
+        MD-to-LBE step ratio used to properly reconstruct velocity accumulator data.
+    include_rhof : bool, optional
+        If True, decode local surrounding-fluid density (``rhof``) fields.
+    interaction : str or None, optional
+        Interaction model identifier. If ``"ladd"``, additional LADD fields are read.
+    n_spec : int or None, optional
+        Number of species relevant for LADD mass exchange arrays. Required if
+        ``interaction="ladd"``.
+    boundary : str or None, optional
+        Boundary-condition model. If ``"periodic_inflow"``, the checkpoint contains
+        an additional ``first_inserted_puid`` key.
+
+    Returns
+    -------
+    dict
+        A dictionary with the following keys:
+            * ``"particles"`` : list of dict  
+              Each entry contains per-particle state fields, with included
+              quantities determined by the configuration flags.
+            * ``"ladd_data"`` : dict or None  
+              Present only when ``interaction="ladd"``; contains
+              ``pfr``, ``pfb``, ``pfg``, ``global_mass_change``,
+              and ``global_mass_target``.
+            * ``"first_inserted_puid"`` : int or None  
+              Present only when ``boundary="periodic_inflow"``.
+
+    Notes
+    -----
+    This reader expects the XDR layout produced by ``write_md_checkpoint_xdr``.
+    The presence or absence of fields is controlled strictly by the provided
+    keyword flags. Inconsistent combinations of flags and file content will
+    cause unpacking errors.
+
     """
+
     particles = []
     ladd_data = {}
     first_inserted_puid = None
