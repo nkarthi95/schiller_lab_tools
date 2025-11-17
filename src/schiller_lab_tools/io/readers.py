@@ -2,37 +2,33 @@ import h5py
 import numpy as np
 import pandas as pd
 
-
 def read_hdf5(filename):
     """
-    Reads data from an HDF5 file and returns it as a NumPy array.
+    Read the first dataset from an HDF5 file and return it as a NumPy array.
 
-    The function attempts to read the first dataset in the specified HDF5 file
-    and converts it into a NumPy array in Fortran order. If the file cannot 
-    be read or an error occurs during the process, the function returns 0.
+    Parameters
+    ----------
+    filename : str
+        Path to the HDF5 file to be read.
 
-    :param filename: 
-        The absolute or relative path to the HDF5 file to be read.
-    :type filename: str
+    Returns
+    -------
+    ndarray or int
+        The first dataset in the file, returned as a NumPy array in
+        Fortran order. Returns ``0`` if the file cannot be opened or
+        an error occurs during reading.
 
-    :return: 
-        A NumPy array containing the data from the first dataset in the file,
-        arranged in Fortran order, if the file is successfully read. Returns 0 if 
-        the file cannot be read or an error occurs.
-    :rtype: numpy.ndarray or int
+    Notes
+    -----
+    The function reads only the first dataset found in the file.
+    No reshaping or additional processing is performed; the dataset
+    is returned in its native layout.
 
-    :note: 
-        - This function assumes the first dataset in the HDF5 file is to be read.
-        - The dataset is loaded in its native layout, and no reshaping or 
-          additional processing is performed.
-
-    :example:
-        >>> import numpy as np
-        >>> data = read_hdf5('example.h5')
-        >>> if isinstance(data, np.ndarray):
-        >>>     print("Data shape:", data.shape)
-        >>> else:
-        >>>     print("Failed to read the file.")
+    Examples
+    --------
+    >>> data = read_hdf5("example.h5")
+    >>> isinstance(data, np.ndarray)
+    True
     """
     try:
         with h5py.File(filename, 'r') as file:
@@ -44,47 +40,47 @@ def read_hdf5(filename):
 
 def read_asc(path, headers=None):
     """
-    Reads data from an ASC file and returns it as a pandas DataFrame along with the timestep.
+    Read simulation data from an ASC file and return a DataFrame and timestep.
 
-    This function processes an ASC file containing simulation data. If no `headers` 
-    are provided, default headers are applied based on the length of the data. 
-    If the file length is 0, a default DataFrame with zero-filled columns is generated. 
+    Parameters
+    ----------
+    path : str
+        File path of the ASC file to read.
+    headers : list of str, optional
+        Custom column headers. If omitted, default headers are assigned based
+        on the number of columns in the file.
 
-    :param path: 
-        The file path of the ASC file to be read.
-    :type path: str
+    Returns
+    -------
+    md_df : pandas.DataFrame
+        DataFrame containing the parsed ASC file data. If the file is empty,
+        a zero-filled DataFrame with default headers is returned.
+    t : int
+        Timestep extracted from the file name. The value is taken as the
+        substring following the last occurrence of the character ``'t'``.
 
-    :param headers: 
-        Custom column headers for the output DataFrame. If not provided, default 
-        headers are assigned based on the length of the data.
-    :type headers: list of str, optional
+    Notes
+    -----
+    If no headers are provided, default headers are inferred from the
+    number of columns:
+        * 13 columns → ['x','y','z','v_x','v_y','v_z','o_x','o_y','o_z',
+                        'w_x','w_y','w_z','p_id']
+        * More than 13 columns → ['x','y','z','v_x','v_y','v_z','o_x','o_y','o_z',
+                                  'w_x','w_y','w_z','Fb_x','Fb_y','Fb_z',
+                                  't_x','t_y','t_z','p_id']
+    Empty ASC files trigger creation of a default DataFrame with these
+    headers and zero-filled values.
 
-    :return: 
-        A tuple containing:
-        - md_df (pandas.DataFrame): The DataFrame containing the data from the ASC file.
-        - t (int): The timestep extracted from the file name.
-    :rtype: tuple
+    Examples
+    --------
+    >>> df, t = read_asc("data/asc_file_t100.asc")
+    >>> df.head()
+    >>> t
+    100
 
-    :note: 
-        - The function infers the timestep `t` from the file name by extracting the value after 
-          the last occurrence of 't' in the file name.
-        - Default headers are:
-          - `['x', 'y', 'z', 'v_x', 'v_y', 'v_z', 'o_x', 'o_y', 'o_z', 'w_x', 'w_y', 'w_z', 'p_id']` 
-            for files with 13 columns.
-          - `['x', 'y', 'z', 'v_x', 'v_y', 'v_z', 'o_x', 'o_y', 'o_z', 'w_x', 'w_y', 'w_z', 
-            'Fb_x', 'Fb_y', 'Fb_z', 't_x', 't_y', 't_z', 'p_id']` for files with more than 13 columns.
-        - If the ASC file is empty, a default DataFrame with zero-filled columns and default headers 
-          is returned.
-
-    :example:
-        >>> df, t = read_asc('data/asc_file_t100.asc')
-        >>> print(df.head())
-        >>> print("Timestep:", t)
-
-        >>> custom_headers = ['col1', 'col2', 'col3']
-        >>> df, t = read_asc('data/asc_file_t100.asc', headers=custom_headers)
-        >>> print(df.head())
-        >>> print("Timestep:", t)
+    >>> custom_headers = ["a", "b", "c"]
+    >>> df, t = read_asc("data/asc_file_t100.asc", headers=custom_headers)
+    >>> df.head()
     """
     md_properties = np.loadtxt(path)
     md_properties = md_properties.T
@@ -114,32 +110,31 @@ def read_asc(path, headers=None):
 
 def rewrite_asc_file(path):
     """
-    Rewrites an ASC file to ensure it is in a NumPy-parsable format.
+    Rewrite an ASC file to enforce NumPy-parsable numeric formatting.
 
-    This function processes an ASC file to correct formatting issues where values 
-    representing zero are not written in a parsable scientific notation. The corrected 
-    file is saved with the same name, overwriting the original. This ensures compatibility 
-    with NumPy parsing, particularly for files generated by lb3d upon checkpoint restart 
-    or run start.
+    Parameters
+    ----------
+    path : str
+        Absolute or relative path of the ASC file to be rewritten.
 
-    :param path: 
-        The absolute or relative path of the ASC file to be rewritten.
-    :type path: str
+    Returns
+    -------
+    int
+        Returns ``1`` after the file is successfully rewritten.
 
-    :return: 
-        Returns 1 to indicate the file has been successfully rewritten.
-    :rtype: int
+    Notes
+    -----
+    The function reads the ASC file line by line, inspects each numeric
+    value, and rewrites entries that lack valid scientific notation
+    formatting (e.g., values missing an ``'E'``). The corrected content
+    is written back to the same file path, overwriting the original.
+    This resolves formatting issues common in ASC files produced during
+    checkpoint restarts or initial LB3D runs.
 
-    :note: 
-        - The function reads the file line by line and checks each numeric value in the file.
-        - If a value is not in a parsable scientific notation (e.g., missing 'E'), it is corrected.
-        - The corrected file is written back to the same path, overwriting the original.
-
-    :example:
-        >>> rewrite_asc_file('output/asc_file.asc')
-        1
-
-        After execution, the file `asc_file.asc` will be in the correct format for NumPy parsing.
+    Examples
+    --------
+    >>> rewrite_asc_file("output/asc_file.asc")
+    1
     """
     with open(path, 'r', encoding='utf-8') as f:
         lines = f.readlines()
