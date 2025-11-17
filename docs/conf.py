@@ -1,8 +1,3 @@
-import os
-import sys
-
-sys.path.insert(0, os.path.abspath('../../schiller_lab_tools'))
-
 # Configuration file for the Sphinx documentation builder.
 #
 # For the full list of built-in configuration values, see the documentation:
@@ -11,18 +6,28 @@ sys.path.insert(0, os.path.abspath('../../schiller_lab_tools'))
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
+import os
+import sys
+
+sys.path.insert(0, os.path.abspath("../"))
+sys.path.insert(0, os.path.abspath('../src'))
+
 project = 'schiller_lab_tools'
-copyright = '2025, Nikhil Karthikeyan, Ulf Schiller'
-author = 'Nikhil Karthikeyan, Ulf Schiller'
+copyright = '2025, Nikhil Karthikeyan, Ulf D. Schiller'
+author = 'Nikhil Karthikeyan, Ulf D. Schiller'
 release = '0.1.0'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = ['sphinx.ext.autodoc']
+extensions = ['sphinx.ext.autodoc',
+              "sphinx.ext.napoleon",
+              "sphinx.ext.autosummary",]
+
+autosummary_generate = True
 
 templates_path = ['_templates']
-exclude_patterns = []
+exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
 
 
