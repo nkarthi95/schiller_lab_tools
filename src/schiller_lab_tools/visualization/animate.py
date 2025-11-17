@@ -9,36 +9,31 @@ from matplotlib import animation
 
 def animate_plot(x, y, interval=50):
     """
-    Create an animation of a 2D line plot over time.
+    Create an animated 2D line plot over multiple timesteps.
 
-    This function takes two lists of lists or numpy arrays representing the x and y 
-    coordinates of data over multiple timesteps and generates an animated plot. The 
-    animation can be rendered in a Jupyter notebook using the :class:`IPython.display.HTML` object.
+    Parameters
+    ----------
+    x : list of lists or ndarray of shape (T, L)
+        X-coordinates for each timestep. ``T`` is the number of frames and
+        ``L`` is the number of points per frame.
+    y : list of lists or ndarray of shape (T, L)
+        Y-coordinates for each timestep, matching the structure of ``x``.
+    interval : int, optional
+        Delay between frames in milliseconds. Default is 50.
 
-    :param x: 
-        The x-coordinates of the data, with shape (t, L), where t is the number 
-        of timesteps and L is the length of data at each timestep.
-    :type x: list of lists or numpy.ndarray
-    :param y: 
-        The y-coordinates of the data, with shape (t, L), where t is the number 
-        of timesteps and L is the length of data at each timestep.
-    :type y: list of lists or numpy.ndarray
-    :param interval: 
-        The delay in milliseconds between frames in the animation. Default is 50.
-    :type interval: int, optional
+    Returns
+    -------
+    matplotlib.animation.FuncAnimation
+        Animation object suitable for display in Jupyter notebooks (e.g.,
+        via ``IPython.display.HTML``).
 
-    :return: 
-        An animation object that can be rendered in a Jupyter notebook using 
-        :class:`IPython.display.HTML`.
-    :rtype: matplotlib.animation.FuncAnimation
-
-    :examples:
-        >>> import numpy as np
-        >>> from IPython.display import HTML
-        >>> x = [np.linspace(0, 2 * np.pi, 100)] * 50
-        >>> y = [np.sin(xi + i * 0.1) for i, xi in enumerate(x)]
-        >>> ani = animate_plot(x, y, interval=100)
-        >>> HTML(ani.to_jshtml())
+    Examples
+    --------
+    >>> x = [np.linspace(0, 2*np.pi, 100)] * 50
+    >>> y = [np.sin(xi + i*0.1) for i, xi in enumerate(x)]
+    >>> ani = animate_plot(x, y, interval=100)
+    >>> from IPython.display import HTML
+    >>> HTML(ani.to_jshtml())
     """
 
     fig, ax = plt.subplots()
@@ -72,51 +67,44 @@ def animate_plot(x, y, interval=50):
 # In[4]:
 
 
-def animate_colormap(data, axs_labels=None, times=None, c_label=None, interval=50, sz=5, cm='bwr'):
+def animate_colormap(data, axs_labels=None, times=None, c_label=None,
+                     interval=50, sz=5, cm="bwr"):
     """
-    Create an animation of a 2D colormap over time.
+    Create an animated colormap from time-dependent 2D data.
 
-    This function takes a 3D numpy array representing time-dependent 2D data and 
-    generates an animated colormap. The animation can be rendered in a Jupyter 
-    notebook using the :class:`IPython.display.HTML` object.
+    Parameters
+    ----------
+    data : ndarray of shape (T, L, M)
+        Time-indexed 2D fields. ``T`` is the number of timesteps, and
+        ``L`` and ``M`` are the spatial dimensions.
+    axs_labels : list of str, optional
+        Axis labels ``[xlabel, ylabel]``. Default is None.
+    times : ndarray of shape (T,), optional
+        Time values associated with each frame. Default is None.
+    c_label : str, optional
+        Label for the colorbar. Default is None.
+    interval : int, optional
+        Delay between frames in milliseconds. Default is 50.
+    sz : int, optional
+        Figure size in inches. Default is 5.
+    cm : str, optional
+        Matplotlib colormap name. Default is "bwr".
 
-    :param data: 
-        A 3D array with shape (t, L, M), where t is the number of timesteps, 
-        and L and M represent the dimensions of each data slice (e.g., rows and columns).
-    :type data: numpy.ndarray
-    :param axs_labels: 
-        A list of length 2 containing strings for the x-axis and y-axis labels, 
-        in the 0th and 1st positions respectively. Default is None.
-    :type axs_labels: list of str, optional
-    :param times: 
-        A 1D array of length t, where each value represents the time corresponding 
-        to each timestep. Default is None.
-    :type times: numpy.ndarray, optional
-    :param c_label: 
-        A label for the colormap (color bar). Default is None.
-    :type c_label: str, optional
-    :param interval: 
-        The delay in milliseconds between frames in the animation. Default is 50.
-    :type interval: int, optional
-    :param sz: 
-        The size of the plot figure. Default is 5.
-    :type sz: int, optional
-    :param cm: 
-        The colormap to use for the animation. Default is 'bwr'.
-    :type cm: str, optional
+    Returns
+    -------
+    matplotlib.animation.FuncAnimation
+        Animation object suitable for display in Jupyter notebooks
+        (e.g., via ``IPython.display.HTML``).
 
-    :return: 
-        An animation object that can be rendered in a Jupyter notebook using 
-        :class:`IPython.display.HTML`.
-    :rtype: matplotlib.animation.FuncAnimation
-
-    :examples:
-        >>> import numpy as np
-        >>> from IPython.display import HTML
-        >>> data = np.random.random((50, 100, 100))  # Example 3D array (50 timesteps, 100x100 grid)
-        >>> ani = animate_colormap(data, axs_labels=["X-axis", "Y-axis"], times=np.arange(50))
-        >>> HTML(ani.to_jshtml())
+    Examples
+    --------
+    >>> data = np.random.random((50, 100, 100))
+    >>> ani = animate_colormap(data, axs_labels=["X-axis", "Y-axis"],
+    ...                        times=np.arange(50))
+    >>> from IPython.display import HTML
+    >>> HTML(ani.to_jshtml())
     """
+
     def init():
         img.set_data(data[0])
         vmin = np.amin(data[0])
