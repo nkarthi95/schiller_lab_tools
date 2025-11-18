@@ -11,3 +11,10 @@ docs/_static/        # unless custom static files are stored here
 **/*.svg
 **/*.gif
 **/*.html
+
+# pip build artifacts
+**/__pycache__/
+**/*.egg-info/
+
+# Jupyter notebooks
+**/*.ipynb
