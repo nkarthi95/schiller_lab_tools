@@ -1,0 +1,20 @@
+# Sphinx build artifacts
+docs/_build/
+docs/auto_examples/
+docs/_images/
+docs/_modules/
+docs/_sources/
+docs/_static/        # unless custom static files are stored here
+**/*.pycode
+**/*.png
+**/*.jpg
+**/*.svg
+**/*.gif
+**/*.html
+
+# pip build artifacts
+**/__pycache__/
+**/*.egg-info/
+
+# Jupyter notebooks
+**/*.ipynb
