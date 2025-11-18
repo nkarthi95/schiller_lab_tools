@@ -17,7 +17,7 @@ def gyroid(nx = 32, ny = 32, nz = 32, t = 0.5, reps = 1, n = 1):
         ``G**n - t**n``. Default is 0.5.
     reps : int or float, optional
         Spatial repetition factor used in the internal sine/cosine scaling
-        functions ``_S`` and ``_C``. Controls unit cell size. Default is 1.
+        functions. Controls unit cell size. Default is 1.
     n : int, optional
         Exponent applied to the base gyroid field before thresholding.
         Used to sharpen or smooth the interface. Default is 1.
@@ -36,13 +36,13 @@ def gyroid(nx = 32, ny = 32, nz = 32, t = 0.5, reps = 1, n = 1):
     """
     X, Y, Z = np.meshgrid(np.arange(0, nx, 1), np.arange(0, ny, 1), np.arange(0, nz, 1))
 
-    Sx = np.sin(2*np.pi*n*X/nx)
-    Sy = np.sin(2*np.pi*n*Y/ny)
-    Sz = np.sin(2*np.pi*n*Z/nz)
+    Sx = np.sin(2*np.pi*reps*X/nx)
+    Sy = np.sin(2*np.pi*reps*Y/ny)
+    Sz = np.sin(2*np.pi*reps*Z/nz)
 
-    Cx = np.cos(2*np.pi*n*X/nx)
-    Cy = np.cos(2*np.pi*n*Y/ny)
-    Cz = np.cos(2*np.pi*n*Z/nz)
+    Cx = np.cos(2*np.pi*reps*X/nx)
+    Cy = np.cos(2*np.pi*reps*Y/ny)
+    Cz = np.cos(2*np.pi*reps*Z/nz)
 
     return (Sx*Cy + Sy*Cz + Sz*Cx)**n - t**n
 
@@ -81,13 +81,13 @@ def honeycomb(nx = 32, ny = 32, nz = 32, t = 0.5, reps = 1, axis = 'z'):
     """
     X, Y, Z = np.meshgrid(np.arange(0, nx, 1), np.arange(0, ny, 1), np.arange(0, nz, 1))
 
-    Sx = np.sin(2*np.pi*n*X/nx)
-    Sy = np.sin(2*np.pi*n*Y/ny)
-    Sz = np.sin(2*np.pi*n*Z/nz)
+    Sx = np.sin(2*np.pi*reps*X/nx)
+    Sy = np.sin(2*np.pi*reps*Y/ny)
+    Sz = np.sin(2*np.pi*reps*Z/nz)
 
-    Cx = np.cos(2*np.pi*n*X/nx)
-    Cy = np.cos(2*np.pi*n*Y/ny)
-    Cz = np.cos(2*np.pi*n*Z/nz)
+    Cx = np.cos(2*np.pi*reps*X/nx)
+    Cy = np.cos(2*np.pi*reps*Y/ny)
+    Cz = np.cos(2*np.pi*reps*Z/nz)
 
     if axis == 'z':
         prod = (Sx*Cy + Sy + Cx)**2 - t**2
