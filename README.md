@@ -21,17 +21,24 @@
 
 ## Installation
 
+If installing from a local clone in a fresh build, first setup the python environment
+
 ```
-pip install schiller_lab_tools
+conda env create -f environment.yml
+conda activate LB3D
 ```
 
-Or install from a local clone:
+Then install `schiller_lab_tools` from a local clone:
 
 ```
 git clone https://github.com/nkarthi95/schiller_lab_tools.git
 cd schiller_lab_tools
 pip install .
 ```
+
+<!-- ```
+pip install schiller_lab_tools
+``` -->
 
 ## Documentation
 
