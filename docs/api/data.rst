@@ -1,5 +1,5 @@
 Data Module
-=========
+===========
 
 .. automodule:: schiller_lab_tools.data.droplets
    :members:

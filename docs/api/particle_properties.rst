@@ -1,5 +1,5 @@
 Particle Properties Module
-=========
+==========================
 
 .. automodule:: schiller_lab_tools.particle_properties.correlation
    :members:

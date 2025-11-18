@@ -22,13 +22,18 @@ release = '0.1.0'
 
 extensions = ['sphinx.ext.autodoc',
               "sphinx.ext.napoleon",
-              "sphinx.ext.autosummary",]
+              "sphinx.ext.autosummary",
+              "sphinx_gallery.gen_gallery"]
+
+sphinx_gallery_conf = {
+    "examples_dirs": ["examples"],       # your raw example .py files
+    "gallery_dirs": ["auto_examples"],   # rendered HTML output
+}
 
 autosummary_generate = True
 
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
-
 
 
 # -- Options for HTML output -------------------------------------------------

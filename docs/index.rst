@@ -21,3 +21,4 @@ documentation for details.
    api/data
    api/particle_properties
    api/lb3d
+   auto_examples/index
