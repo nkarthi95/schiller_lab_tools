@@ -78,7 +78,7 @@ None
 
 
 ## EDIT THIS ONLY ##
-path = "../../data/lb3d"
+path = "../../../data/lb3d"
 nx, ny, nz = [64, 64, 128]
 Q = 19
 timestep = 10000

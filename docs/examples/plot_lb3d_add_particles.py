@@ -25,7 +25,7 @@ import os
 # In[ ]:
 
 
-path = "../../data/lb3d"
+path = "../../../data/lb3d"
 boxDims = np.array([64, 64, 128])
 nx, ny, nz = boxDims
 Q = 19
