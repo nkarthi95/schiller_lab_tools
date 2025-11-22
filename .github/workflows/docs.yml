@@ -33,12 +33,21 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          activate-environment: docs
+          environment-file: environment.yml
+          python-version: 3.11
+          auto-activate-base: false
+      
+      - name: Install package
+        shell: bash -l {0}
         run: |
           pip install .
-          pip install sphinx sphinx-gallery numpy matplotlib
 
       - name: Build documentation
+        shell: bash -l {0}
         run: |
           cd docs
           make html
