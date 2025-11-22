@@ -16,6 +16,7 @@ import numpy as np
 import glob
 from schiller_lab_tools.lb3d import checkpoint_io
 from schiller_lab_tools.data import particles
+from schiller_lab_tools.data import lb3d_checkpoint_generator
 import copy
 import os
 
@@ -77,43 +78,58 @@ None
 # In[ ]:
 
 
-## EDIT THIS ONLY ##
-path = "../../../data/lb3d"
-nx, ny, nz = [64, 64, 128]
-Q = 19
-timestep = 10000
-nprocs = 4
-Rp_old = 8
-Ro_old = 4
-npart = 10
-rhof = 0.7
-radius_prop = 0.7 # assumes z is the long axis if box size is not cubic
+# ## EDIT THIS ONLY ##
+# path = "../../../data/lb3d"
+# nx, ny, nz = [64, 64, 128]
+# Q = 19
+# timestep = 10000
+# nprocs = 4
+# Rp_old = 8
+# Ro_old = 4
+# npart = 10
+# rhof = 0.7
+# radius_prop = 0.7 # assumes z is the long axis if box size is not cubic
 
-gr_out = "restart"
-Rp_new = 5
-Ro_new = 5
-## EDIT THIS ONLY ##
+# gr_out = "restart"
+# Rp_new = 5
+# Ro_new = 5
+# ## EDIT THIS ONLY ##
 
-output_path = f"{path}/change_particle_shape/Ro_{Ro_new}-Rp_{Rp_new}-np_{npart}"
-os.makedirs(output_path, exist_ok=True)
+# output_path = f"{path}/change_particle_shape/Ro_{Ro_new}-Rp_{Rp_new}-np_{npart}"
+# os.makedirs(output_path, exist_ok=True)
 
 
 # In[ ]:
 
 
-## READING OLD CHECKPOINTS ##
-checkparams_files = sorted(glob.glob(f"{path}/checkparams*{timestep:08d}*.xdr"))[0]
-fluid_checkpoint_files = sorted(glob.glob(f"{path}/checkpoint*{timestep:08d}*.xdr"))
-checktopo_files = sorted(glob.glob(f"{path}/checktopo*{timestep:08d}*.xdr"))[0]
-md_checkpoint_files = sorted(glob.glob(f"{path}/md-checkpoint*{timestep:08d}*.xdr"))[0]
+# ## READING OLD CHECKPOINTS ##
+# checkparams_files = sorted(glob.glob(f"{path}/checkparams*{timestep:08d}*.xdr"))[0]
+# fluid_checkpoint_files = sorted(glob.glob(f"{path}/checkpoint*{timestep:08d}*.xdr"))
+# checktopo_files = sorted(glob.glob(f"{path}/checktopo*{timestep:08d}*.xdr"))[0]
+# md_checkpoint_files = sorted(glob.glob(f"{path}/md-checkpoint*{timestep:08d}*.xdr"))[0]
 
-curr_check_params = checkpoint_io.read_checkparams_xdr(checkparams_files)
-curr_topo = checkpoint_io.read_checktopo_xdr(checktopo_files, nprocs = nprocs)
-curr_fluid_params = checkpoint_io.read_checkpoint_xdr(fluid_checkpoint_files, nx, ny, nz, curr_topo, Q)
-curr_md_params = checkpoint_io.read_md_checkpoint_xdr(md_checkpoint_files, use_rotation=True, interaction="ladd", n_spec = 2)
-print("Checkpoints to be copied have been read")
-## READING OLD CHECKPOINTS ##
+# curr_check_params = checkpoint_io.read_checkparams_xdr(checkparams_files)
+# curr_topo = checkpoint_io.read_checktopo_xdr(checktopo_files, nprocs = nprocs)
+# curr_fluid_params = checkpoint_io.read_checkpoint_xdr(fluid_checkpoint_files, nx, ny, nz, curr_topo, Q)
+# curr_md_params = checkpoint_io.read_md_checkpoint_xdr(md_checkpoint_files, use_rotation=True, interaction="ladd", n_spec = 2)
+# print("Checkpoints to be copied have been read")
+# ## READING OLD CHECKPOINTS ##
 
+Q = 19
+Rp_old = 5
+Ro_old = 5
+npart = 10
+rhof = 0.7
+# radius_prop = 0.7 # assumes z is the long axis if box size is not cubic
+
+gr_out = "restart"
+Rp_new = 8
+Ro_new = 4
+
+curr_check_params = lb3d_checkpoint_generator.generate_check_params_file()
+curr_topo = lb3d_checkpoint_generator.generate_curr_topo()
+curr_md_params = lb3d_checkpoint_generator.generate_md_params()
+curr_fluid_params = lb3d_checkpoint_generator.generate_fluid_params()
 
 # # Parameter file
 
@@ -188,29 +204,29 @@ print("New mpi topology file generated")
 # In[ ]:
 
 
-## OUTPUTTING NEW CHECKPOINTS ##
-uid = np.random.randint(0, 2**31, 1)[0] # Generating random number of a signed FP32 integer
+# ## OUTPUTTING NEW CHECKPOINTS ##
+# uid = np.random.randint(0, 2**31, 1)[0] # Generating random number of a signed FP32 integer
 
-checkparams_file_template = "checkparams_{0}_t{1:08d}-{2:010d}.xdr"
-fluid_checkpoint_file_template = "checkpoint_{0}_t{1:08d}-{2:010d}_p{3:06d}.xdr"
-checktopo_file_template = "checktopo_{0}_t{1:08d}-{2:010d}.xdr"
-md_checkpoint_file_template = "md-checkpoint_{0}_t{1:08d}-{2:010d}.xdr"
+# checkparams_file_template = "checkparams_{0}_t{1:08d}-{2:010d}.xdr"
+# fluid_checkpoint_file_template = "checkpoint_{0}_t{1:08d}-{2:010d}_p{3:06d}.xdr"
+# checktopo_file_template = "checktopo_{0}_t{1:08d}-{2:010d}.xdr"
+# md_checkpoint_file_template = "md-checkpoint_{0}_t{1:08d}-{2:010d}.xdr"
 
-output_params_path = output_path + "/" + checkparams_file_template.format(gr_out, timestep, uid)
-output_fluid_path = output_path + "/" + fluid_checkpoint_file_template.format(gr_out, timestep, uid, 0)
-output_topo_path = output_path + "/" + checktopo_file_template.format(gr_out, timestep, uid)
-output_md_check_path = output_path + "/" + md_checkpoint_file_template.format(gr_out, timestep, uid)
+# output_params_path = output_path + "/" + checkparams_file_template.format(gr_out, timestep, uid)
+# output_fluid_path = output_path + "/" + fluid_checkpoint_file_template.format(gr_out, timestep, uid, 0)
+# output_topo_path = output_path + "/" + checktopo_file_template.format(gr_out, timestep, uid)
+# output_md_check_path = output_path + "/" + md_checkpoint_file_template.format(gr_out, timestep, uid)
 
-checkpoint_io.write_checkparams_xdr(output_params_path, new_check_params)
-checkpoint_io.write_checkpoint_xdr(output_fluid_path, new_fluid_params)
-checkpoint_io.write_checktopo_xdr(output_topo_path, new_topo)
-checkpoint_io.write_md_checkpoint_xdr(output_md_check_path, new_md_params["particles"], 
-                        use_rotation=True, steps_per_lbe_step=1, interaction="ladd",
-                        ladd_props=new_md_params['ladd_data'],
-                        n_spec=2)
+# checkpoint_io.write_checkparams_xdr(output_params_path, new_check_params)
+# checkpoint_io.write_checkpoint_xdr(output_fluid_path, new_fluid_params)
+# checkpoint_io.write_checktopo_xdr(output_topo_path, new_topo)
+# checkpoint_io.write_md_checkpoint_xdr(output_md_check_path, new_md_params["particles"], 
+#                         use_rotation=True, steps_per_lbe_step=1, interaction="ladd",
+#                         ladd_props=new_md_params['ladd_data'],
+#                         n_spec=2)
 
-print(f"Checkpoint output successful!. UID:{uid}")
-## OUTPUTTING NEW CHECKPOINTS ##
+# print(f"Checkpoint output successful!. UID:{uid}")
+# ## OUTPUTTING NEW CHECKPOINTS ##
 
 
 # In[ ]:
