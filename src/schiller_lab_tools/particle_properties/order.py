@@ -2,7 +2,7 @@ import numpy as np
 import freud
 from scipy.optimize import brute, fmin
 
-def calculate_nematic_order(orientations, director=None):
+def calculate_nematic_order(orientations):
   """
   Compute the nematic order parameter for a system of particle orientations.
 
@@ -10,25 +10,23 @@ def calculate_nematic_order(orientations, director=None):
   ----------
   orientations : ndarray of shape (N, D)
       Orientation vectors for ``N`` particles in ``D`` dimensions.
-  director : array_like of shape (D,), optional
-      Reference direction used to evaluate alignment. Defaults to the
-      unit vector along the z-axis ``[0, 0, 1]``.
 
   Returns
   -------
-  float
+  nematic_order_parameter : float
       Nematic order parameter. Values near 1 indicate strong alignment
       with the director; 0 corresponds to no net alignment; -0.5
       corresponds to orthogonal anti-alignment.
+  nematic_director : ndarray
+      The director of the nematic order parameter for the supplied particle orientations
 
   Notes
   -----
   The computation uses ``freud.order.Nematic`` to evaluate alignment of
-  particle orientations relative to the supplied director. The director
-  is interpreted as the preferred axis of orientation, as in liquid-crystal
-  or elongated-particle systems. Positive values indicate alignment along
-  the director, negative values indicate alignment opposite or orthogonal
-  to it.
+  particle orientations. The directoris interpreted as the preferred axis of 
+  orientation, as in liquid-crystal or elongated-particle systems. Positive values 
+  indicate alignment along the director, negative values indicate alignment opposite 
+  or orthogonal to it.
 
   Examples
   --------
@@ -37,11 +35,11 @@ def calculate_nematic_order(orientations, director=None):
   >>> calculate_nematic_order(orientations, director)
   """
 
-  if not isinstance(director, np.ndarray):
-      director = np.array(director)
-  nematic = freud.order.Nematic(director)
+  nematic = freud.order.Nematic()
   nematic.compute(orientations)
-  return nematic.order
+  nematic_order_parameter = nematic.order
+  nematic_director = nematic.director
+  return nematic_order_parameter, nematic_director
 
 def calculate_ql(boxDims, positions, L=6, voronoi=True, average=False, weighted=False):
     """
