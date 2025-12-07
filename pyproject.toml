@@ -16,11 +16,8 @@ classifiers = [
     "Operating System :: OS Independent",
     "License :: OSI Approved :: MIT License",
 ]
-project_urls = {
-    "Changelog" = "https://github.com/nkarthi95/schiller_lab_tools/blob/main/CHANGELOG.md"
-}
-
 
 [project.urls]
 Homepage = "https://github.com/nkarthi95/schiller_lab_tools"
 Issues = "https://github.com/nkarthi95/schiller_lab_tools/issues"
+Changelog = "https://github.com/nkarthi95/schiller_lab_tools/blob/main/CHANGELOG.md"
