@@ -33,11 +33,11 @@ def calculate_nematic_order(orientations):
     >>> calculate_nematic_order(orientations, director)
     """
 
-  nematic = freud.order.Nematic()
-  nematic.compute(orientations)
-  nematic_order_parameter = nematic.order
-  nematic_director = nematic.director
-  return nematic_order_parameter, nematic_director
+    nematic = freud.order.Nematic()
+    nematic.compute(orientations)
+    nematic_order_parameter = nematic.order
+    nematic_director = nematic.director
+    return nematic_order_parameter, nematic_director
 
 def calculate_ql(boxDims, positions, L=6, voronoi=True, average=False, weighted=False):
     """
