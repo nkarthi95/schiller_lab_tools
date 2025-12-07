@@ -3,37 +3,35 @@ import freud
 from scipy.optimize import brute, fmin
 
 def calculate_nematic_order(orientations):
-  """
-  Compute the nematic order parameter for a system of particle orientations.
+    """
+    Compute the nematic order parameter for a set of particle orientation vectors.
 
-  Parameters
-  ----------
-  orientations : ndarray of shape (N, D)
-      Orientation vectors for ``N`` particles in ``D`` dimensions.
+    Parameters
+    ----------
+    orientations : ndarray, shape (N, D)
+        Array of orientation vectors for N particles in D dimensions.
 
-  Returns
-  -------
-  nematic_order_parameter : float
-      Nematic order parameter. Values near 1 indicate strong alignment
-      with the director; 0 corresponds to no net alignment; -0.5
-      corresponds to orthogonal anti-alignment.
-  nematic_director : ndarray
-      The director of the nematic order parameter for the supplied particle orientations
+    Returns
+    -------
+    nematic_order_parameter : float
+        Scalar nematic order parameter. Values near 1 indicate strong alignment
+        with the director; 0 indicates no net alignment; negative values reflect
+        anti-alignment or orthogonal orientation.
+    nematic_director : ndarray
+        Unit vector giving the director associated with the computed nematic order.
 
-  Notes
-  -----
-  The computation uses ``freud.order.Nematic`` to evaluate alignment of
-  particle orientations. The directoris interpreted as the preferred axis of 
-  orientation, as in liquid-crystal or elongated-particle systems. Positive values 
-  indicate alignment along the director, negative values indicate alignment opposite 
-  or orthogonal to it.
+    Notes
+    -----
+    The calculation uses ``freud.order.Nematic`` to determine the alignment of
+    particle orientations. The director represents the preferred axis of orientation,
+    as in liquid-crystal or elongated-particle systems.
 
-  Examples
-  --------
-  >>> orientations = np.random.rand(100, 3)
-  >>> director = [0, 0, 1]
-  >>> calculate_nematic_order(orientations, director)
-  """
+    Examples
+    --------
+    >>> orientations = np.random.rand(100, 3)
+    >>> director = [0, 0, 1]
+    >>> calculate_nematic_order(orientations, director)
+    """
 
   nematic = freud.order.Nematic()
   nematic.compute(orientations)
