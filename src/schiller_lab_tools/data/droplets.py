@@ -50,11 +50,15 @@ def draw_ellipsoid_in_box(ellipseDims, boxDims, npart = 0, seedval = None):
         pad_width[i][1] = diffs[i]//2+diffs[i]%2
     volume_field = np.pad(volume_field, pad_width)
 
-    particle_positions = fibonacci_sphere(npart, R=ellipseDims)
-    particle_positions += np.array(center_of_mass(volume_field))[np.newaxis, :]
+    if npart == 0:
+        particle_positions = np.nan
+        particle_orientations = np.nan
+    else:
+        particle_positions = fibonacci_sphere(npart, R=ellipseDims)
+        particle_positions += np.array(center_of_mass(volume_field))[np.newaxis, :]
 
-    rng = np.random.default_rng(seedval)
-    particle_orientations = rng.random(size = (npart, 3))
-    particle_orientations /= np.linalg.norm(particle_orientations, axis = 1)[:, np.newaxis]
+        rng = np.random.default_rng(seedval)
+        particle_orientations = rng.random(size = (npart, 3))
+        particle_orientations /= np.linalg.norm(particle_orientations, axis = 1)[:, np.newaxis]
 
     return volume_field, particle_positions, particle_orientations
